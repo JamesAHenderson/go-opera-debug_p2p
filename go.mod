@@ -5,6 +5,7 @@ go 1.14
 require (
 	github.com/Fantom-foundation/lachesis-base v0.0.0-20220103160934-6b4931c60582
 	github.com/allegro/bigcache v1.2.1 // indirect
+	github.com/beorn7/perks v1.0.1
 	github.com/certifi/gocertifi v0.0.0-20191021191039-0944d244cd40 // indirect
 	github.com/cespare/cp v1.1.1
 	github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd // indirect
