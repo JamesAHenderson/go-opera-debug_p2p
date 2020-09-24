@@ -133,8 +133,9 @@ type Service struct {
 	blockBusyFlag uint32
 	eventBusyFlag uint32
 
-	feed     ServiceFeed
-	eventMux *event.TypeMux
+	feed                   ServiceFeed
+	eventMux               *event.TypeMux
+	currentEventProcessing hash.Event
 
 	gpo *gasprice.Oracle
 
