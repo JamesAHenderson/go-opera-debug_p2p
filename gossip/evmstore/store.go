@@ -91,6 +91,14 @@ func (s *Store) initCache() {
 
 func (s *Store) InitEvmSnapshot(root hash.Hash) (err error) {
 	s.table.Snaps, err = snapshot.New(kvdb2ethdb.Wrap(nokeyiserr.Wrap(s.EvmKvdbTable())), s.table.EvmState.TrieDB(), s.cfg.Cache.EvmSnap/opt.MiB, common.Hash(root), false, true, false)
+
+	println("verification")
+	err = s.table.Snaps.Verify(common.Hash(root))
+	errStr := ""
+	if err != nil {
+		errStr = err.Error()
+	}
+	println("verified", errStr)
 	return err
 }
 

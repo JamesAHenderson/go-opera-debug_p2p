@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Fantom-foundation/lachesis-base/inter/idx"
+	"github.com/Fantom-foundation/lachesis-base/kvdb/leveldb"
 	"github.com/Fantom-foundation/lachesis-base/kvdb/table"
 	"github.com/Fantom-foundation/lachesis-base/utils/simplewlru"
 	"github.com/ethereum/go-ethereum/cmd/utils"
@@ -14,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/syndtr/goleveldb/leveldb/opt"
 	"gopkg.in/urfave/cli.v1"
 
 	"github.com/Fantom-foundation/go-opera/integration"
@@ -26,9 +28,28 @@ var (
 )
 
 func checkEvm(ctx *cli.Context) error {
-	if len(ctx.Args()) != 0 {
+	if len(ctx.Args()) != 2 {
 		utils.Fatalf("This command doesn't require an argument.")
 	}
+
+	adb, _ := leveldb.New(ctx.Args()[0], 64 * opt.MiB, 64, nil, nil)
+	bdb, _ := leveldb.New(ctx.Args()[1], 64 * opt.MiB, 64, nil, nil)
+
+	it := adb.NewIterator(nil, nil)
+	for it.Next() {
+		val, _ := bdb.Get(it.Key())
+		if val == nil {
+			println("missing", common.Bytes2Hex(it.Key()), common.Bytes2Hex(it.Value()))
+		} else if !bytes.Equal(val, it.Value()) {
+			println("mismatch", common.Bytes2Hex(it.Key()), common.Bytes2Hex(it.Value()), common.Bytes2Hex(val))
+		}
+	}
+
+	it.Release()
+	adb.Close()
+	bdb.Close()
+
+	return nil
 
 	cfg := makeAllConfigs(ctx)
 
