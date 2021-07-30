@@ -63,8 +63,6 @@ func initFlags() {
 
 	// Flags that configure the node.
 	gpoFlags = []cli.Flag{
-		utils.GpoBlocksFlag,
-		utils.GpoPercentileFlag,
 		utils.GpoMaxGasPriceFlag,
 	}
 	accountFlags = []cli.Flag{
@@ -147,8 +145,8 @@ func initFlags() {
 		utils.WSPathPrefixFlag,
 		utils.IPCDisabledFlag,
 		utils.IPCPathFlag,
-		utils.RPCGlobalGasCapFlag,
-		utils.RPCGlobalTxFeeCapFlag,
+		RPCGlobalGasCapFlag,
+		RPCGlobalTxFeeCapFlag,
 	}
 
 	metricsFlags = []cli.Flag{

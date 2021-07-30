@@ -1,8 +1,11 @@
 package gossip
 
 import (
+	"math/big"
 	"sync/atomic"
 
+	"github.com/Fantom-foundation/lachesis-base/hash"
+	"github.com/Fantom-foundation/lachesis-base/inter/idx"
 	"github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/Fantom-foundation/go-opera/evmcore"
@@ -29,16 +32,12 @@ func (ew *emitterWorld) Check(emitted *inter.EventPayload, parents inter.Events)
 }
 
 func (ew *emitterWorld) Process(emitted *inter.EventPayload) error {
-	err := ew.s.processEvent(emitted)
-	if err != nil {
-		ew.s.Log.Crit("Self-event connection failed", "err", err.Error())
-	}
+	return ew.s.processEvent(emitted)
+}
 
-	ew.s.feed.newEmittedEvent.Send(emitted) // PM listens and will broadcast it
-	if err != nil {
-		ew.s.Log.Crit("Failed to post self-event", "err", err.Error())
-	}
-	return nil
+func (ew *emitterWorld) Broadcast(emitted *inter.EventPayload) {
+	// PM listens and will broadcast it
+	ew.s.feed.newEmittedEvent.Send(emitted)
 }
 
 func (ew *emitterWorld) Build(e *inter.MutableEventPayload, onIndexed func()) error {
@@ -59,4 +58,15 @@ func (ew *emitterWorld) IsSynced() bool {
 
 func (ew *emitterWorld) PeersNum() int {
 	return ew.s.pm.peers.Len()
+}
+
+func (ew *emitterWorld) GetHeads(epoch idx.Epoch) hash.Events {
+	return ew.Store.GetHeadsSlice(epoch)
+}
+
+func (ew *emitterWorld) GetLastEvent(epoch idx.Epoch, from idx.ValidatorID) *hash.Event {
+	return ew.Store.GetLastEvent(epoch, from)
+}
+func (ew *emitterWorld) GetRecommendedGasPrice() *big.Int {
+	return ew.s.GetEvmStateReader().RecommendedMinGasPrice()
 }

@@ -5,12 +5,15 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"math/big"
 	"os"
+	"path"
 	"path/filepath"
 	"reflect"
 	"strings"
 
 	"github.com/Fantom-foundation/lachesis-base/abft"
+	"github.com/Fantom-foundation/lachesis-base/hash"
 	"github.com/Fantom-foundation/lachesis-base/utils/cachescale"
 	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/common"
@@ -26,6 +29,7 @@ import (
 	"github.com/Fantom-foundation/go-opera/gossip/gasprice"
 	"github.com/Fantom-foundation/go-opera/integration"
 	"github.com/Fantom-foundation/go-opera/integration/makegenesis"
+	"github.com/Fantom-foundation/go-opera/opera"
 	"github.com/Fantom-foundation/go-opera/opera/genesisstore"
 	futils "github.com/Fantom-foundation/go-opera/utils"
 	"github.com/Fantom-foundation/go-opera/vecmt"
@@ -80,12 +84,28 @@ var (
 		Name:  "tracenode",
 		Usage: "If present, than this node records inner transaction traces",
 	}
+	RPCGlobalGasCapFlag = cli.Uint64Flag{
+		Name:  "rpc.gascap",
+		Usage: "Sets a cap on gas that can be used in ftm_call/estimateGas (0=infinite)",
+		Value: gossip.DefaultConfig(cachescale.Identity).RPCGasCap,
+	}
+	RPCGlobalTxFeeCapFlag = cli.Float64Flag{
+		Name:  "rpc.txfeecap",
+		Usage: "Sets a cap on transaction fee (in FTM) that can be sent via the RPC APIs (0 = no cap)",
+		Value: gossip.DefaultConfig(cachescale.Identity).RPCTxFeeCap,
+	}
+
+	AllowedOperaGenesisHashes = map[uint64]hash.Hash{
+		opera.MainNetworkID: hash.HexToHash("0x4a53c5445584b3bfc20dbfb2ec18ae20037c716f3ba2d9e1da768a9deca17cb4"),
+		opera.TestNetworkID: hash.HexToHash("0xc4a5fc96e575a16a9a0c7349d44dc4d0f602a54e0a8543360c2fee4c3937b49e"),
+	}
 )
 
 const (
 	// DefaultCacheSize is calculated as memory consumption in a worst case scenario with default configuration
 	// Average memory consumption might be 3-5 times lower than the maximum
-	DefaultCacheSize = 3072
+	DefaultCacheSize  = 3200
+	ConstantCacheSize = 1024
 )
 
 // These settings ensure that TOML keys use the same names as Go struct fields.
@@ -112,11 +132,12 @@ type config struct {
 
 func (c *config) AppConfigs() integration.Configs {
 	return integration.Configs{
-		Opera:         c.Opera,
-		OperaStore:    c.OperaStore,
-		Lachesis:      c.Lachesis,
-		LachesisStore: c.LachesisStore,
-		VectorClock:   c.VectorClock,
+		Opera:          c.Opera,
+		OperaStore:     c.OperaStore,
+		Lachesis:       c.Lachesis,
+		LachesisStore:  c.LachesisStore,
+		VectorClock:    c.VectorClock,
+		AllowedGenesis: AllowedOperaGenesisHashes,
 	}
 }
 
@@ -220,11 +241,8 @@ func setDataDir(ctx *cli.Context, cfg *node.Config) {
 }
 
 func setGPO(ctx *cli.Context, cfg *gasprice.Config) {
-	if ctx.GlobalIsSet(utils.GpoBlocksFlag.Name) {
-		cfg.Blocks = ctx.GlobalInt(utils.GpoBlocksFlag.Name)
-	}
-	if ctx.GlobalIsSet(utils.GpoPercentileFlag.Name) {
-		cfg.Percentile = ctx.GlobalInt(utils.GpoPercentileFlag.Name)
+	if ctx.GlobalIsSet(utils.GpoMaxGasPriceFlag.Name) {
+		cfg.MaxPrice = big.NewInt(ctx.GlobalInt64(utils.GpoMaxGasPriceFlag.Name))
 	}
 }
 
@@ -277,11 +295,11 @@ func gossipConfigWithFlags(ctx *cli.Context, src gossip.Config) (gossip.Config, 
 	setGPO(ctx, &cfg.GPO)
 	setTxPool(ctx, &cfg.TxPool)
 
-	if ctx.GlobalIsSet(utils.RPCGlobalGasCapFlag.Name) {
-		cfg.RPCGasCap = ctx.GlobalUint64(utils.RPCGlobalGasCapFlag.Name)
+	if ctx.GlobalIsSet(RPCGlobalGasCapFlag.Name) {
+		cfg.RPCGasCap = ctx.GlobalUint64(RPCGlobalGasCapFlag.Name)
 	}
-	if ctx.GlobalIsSet(utils.RPCGlobalTxFeeCapFlag.Name) {
-		cfg.RPCTxFeeCap = ctx.GlobalFloat64(utils.RPCGlobalTxFeeCapFlag.Name)
+	if ctx.GlobalIsSet(RPCGlobalTxFeeCapFlag.Name) {
+		cfg.RPCTxFeeCap = ctx.GlobalFloat64(RPCGlobalTxFeeCapFlag.Name)
 	}
 
 	err := setValidator(ctx, &cfg.Emitter)
@@ -319,8 +337,8 @@ func cacheScaler(ctx *cli.Context) cachescale.Func {
 		log.Crit("Invalid flag", "flag", CacheFlag.Name, "err", fmt.Sprintf("minimum cache size is %d MB", DefaultCacheSize))
 	}
 	return cachescale.Ratio{
-		Base:   DefaultCacheSize,
-		Target: uint64(totalCache),
+		Base:   DefaultCacheSize - ConstantCacheSize,
+		Target: uint64(totalCache - ConstantCacheSize),
 	}
 }
 
@@ -359,6 +377,9 @@ func mayMakeAllConfigs(ctx *cli.Context) (*config, error) {
 		return nil, err
 	}
 	cfg.Node = nodeConfigWithFlags(ctx, cfg.Node)
+	if cfg.Opera.Emitter.Validator.ID != 0 && len(cfg.Opera.Emitter.PrevEmittedEventFile.Path) == 0 {
+		cfg.Opera.Emitter.PrevEmittedEventFile.Path = cfg.Node.ResolvePath(path.Join("emitter", fmt.Sprintf("last-%d", cfg.Opera.Emitter.Validator.ID)))
+	}
 
 	if err := cfg.Opera.Validate(); err != nil {
 		return nil, err

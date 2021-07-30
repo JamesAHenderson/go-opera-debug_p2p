@@ -43,6 +43,7 @@ import (
 	"github.com/Fantom-foundation/go-opera/inter"
 	"github.com/Fantom-foundation/go-opera/logger"
 	"github.com/Fantom-foundation/go-opera/opera"
+	"github.com/Fantom-foundation/go-opera/utils/gsignercache"
 	"github.com/Fantom-foundation/go-opera/utils/wgmutex"
 	"github.com/Fantom-foundation/go-opera/valkeystore"
 	"github.com/Fantom-foundation/go-opera/vecmt"
@@ -139,6 +140,8 @@ type Service struct {
 
 	feed ServiceFeed
 
+	gpo *gasprice.Oracle
+
 	// application protocol
 	pm *ProtocolManager
 
@@ -191,30 +194,6 @@ func newService(config Config, store *Store, signer valkeystore.SignerI, blockPr
 
 	svc.blockProcTasks = workers.New(new(sync.WaitGroup), svc.blockProcTasksDone, 1)
 
-	dnsclient := dnsdisc.NewClient(dnsdisc.Config{})
-	var err error
-	svc.dialCandidates, err = dnsclient.NewIterator()
-
-	// create tx pool
-	net := store.GetRules()
-	stateReader := svc.GetEvmStateReader()
-	svc.txpool = evmcore.NewTxPool(config.TxPool, net.EvmChainConfig(), stateReader)
-
-	// create checkers
-	svc.heavyCheckReader.Addrs.Store(NewEpochPubKeys(svc.store, svc.store.GetEpoch()))                                             // read pub keys of current epoch from disk
-	svc.gasPowerCheckReader.Ctx.Store(NewGasPowerContext(svc.store, svc.store.GetValidators(), svc.store.GetEpoch(), net.Economy)) // read gaspower check data from disk
-	svc.checkers = makeCheckers(config.HeavyCheck, net.EvmChainConfig().ChainID, &svc.heavyCheckReader, &svc.gasPowerCheckReader, svc.store)
-
-	// create protocol manager
-	svc.pm, err = newHandler(handlerConfig{config, &svc.feed, svc.txpool, svc.engineMu, svc.checkers, store, svc.processEvent})
-	if err != nil {
-		return nil, err
-	}
-
-	// create API backend
-	svc.EthAPI = &EthAPIBackend{config.ExtRPCEnabled, svc, stateReader, nil, config.AllowUnprotectedTxs}
-	svc.EthAPI.gpo = gasprice.NewOracle(svc.EthAPI, svc.config.GPO)
-
 	// load epoch DB
 	svc.store.loadEpochStore(svc.store.GetEpoch())
 	es := svc.store.getEpochStore(svc.store.GetEpoch())
@@ -224,6 +203,33 @@ func newService(config Config, store *Store, signer valkeystore.SignerI, blockPr
 	// load caches for mutable values to avoid race condition
 	svc.store.GetBlockEpochState()
 	svc.store.GetHighestLamport()
+
+	// create GPO
+	svc.gpo = gasprice.NewOracle(&GPOBackend{store}, svc.config.GPO)
+
+	// create checkers
+	net := store.GetRules()
+	svc.heavyCheckReader.Addrs.Store(NewEpochPubKeys(svc.store, svc.store.GetEpoch()))                                             // read pub keys of current epoch from disk
+	svc.gasPowerCheckReader.Ctx.Store(NewGasPowerContext(svc.store, svc.store.GetValidators(), svc.store.GetEpoch(), net.Economy)) // read gaspower check data from disk
+	svc.checkers = makeCheckers(config.HeavyCheck, net.EvmChainConfig().ChainID, &svc.heavyCheckReader, &svc.gasPowerCheckReader, svc.store)
+
+	// create tx pool
+	stateReader := svc.GetEvmStateReader()
+	svc.txpool = evmcore.NewTxPool(config.TxPool, net.EvmChainConfig(), stateReader)
+
+	// init dialCandidates
+	dnsclient := dnsdisc.NewClient(dnsdisc.Config{})
+	var err error
+	svc.dialCandidates, err = dnsclient.NewIterator()
+
+	// create protocol manager
+	svc.pm, err = newHandler(handlerConfig{config, &svc.feed, svc.txpool, svc.engineMu, svc.checkers, store, svc.processEvent})
+	if err != nil {
+		return nil, err
+	}
+
+	// create API backend
+	svc.EthAPI = &EthAPIBackend{config.ExtRPCEnabled, svc, stateReader, config.AllowUnprotectedTxs}
 
 	svc.emitter = svc.makeEmitter(signer)
 
@@ -235,7 +241,7 @@ func newService(config Config, store *Store, signer valkeystore.SignerI, blockPr
 // makeCheckers builds event checkers
 func makeCheckers(heavyCheckCfg heavycheck.Config, chainID *big.Int, heavyCheckReader *HeavyCheckReader, gasPowerCheckReader *GasPowerCheckReader, store *Store) *eventcheck.Checkers {
 	// create signatures checker
-	heavyCheck := heavycheck.New(heavyCheckCfg, heavyCheckReader, types.NewEIP2930Signer(chainID))
+	heavyCheck := heavycheck.New(heavyCheckCfg, heavyCheckReader, gsignercache.Wrap(types.NewEIP2930Signer(chainID)))
 
 	// create gaspower checker
 	gaspowerCheck := gaspowercheck.New(gasPowerCheckReader)
@@ -250,7 +256,7 @@ func makeCheckers(heavyCheckCfg heavycheck.Config, chainID *big.Int, heavyCheckR
 }
 
 func (s *Service) makeEmitter(signer valkeystore.SignerI) *emitter.Emitter {
-	txSigner := types.NewEIP2930Signer(s.store.GetRules().EvmChainConfig().ChainID)
+	txSigner := gsignercache.Wrap(types.NewEIP2930Signer(s.store.GetRules().EvmChainConfig().ChainID))
 
 	return emitter.NewEmitter(s.config.Emitter, emitter.World{
 		External: &emitterWorld{

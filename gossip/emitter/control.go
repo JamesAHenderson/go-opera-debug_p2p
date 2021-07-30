@@ -7,12 +7,12 @@ import (
 	"github.com/Fantom-foundation/lachesis-base/inter/idx"
 	"github.com/Fantom-foundation/lachesis-base/inter/pos"
 
-	"github.com/Fantom-foundation/go-opera/gossip/emitter/piecefunc"
 	"github.com/Fantom-foundation/go-opera/inter"
+	"github.com/Fantom-foundation/go-opera/utils/piecefunc"
 )
 
 func scalarUpdMetric(diff idx.Event, weight pos.Weight, totalWeight pos.Weight) ancestor.Metric {
-	return ancestor.Metric(piecefunc.Get(uint64(diff)*piecefunc.DecimalUnit, scalarUpdMetricF)) * ancestor.Metric(weight) / ancestor.Metric(totalWeight)
+	return ancestor.Metric(scalarUpdMetricF(uint64(diff)*piecefunc.DecimalUnit)) * ancestor.Metric(weight) / ancestor.Metric(totalWeight)
 }
 
 func updMetric(median, cur, upd idx.Event, validatorIdx idx.Validator, validators *pos.Validators) ancestor.Metric {
@@ -27,7 +27,7 @@ func updMetric(median, cur, upd idx.Event, validatorIdx idx.Validator, validator
 }
 
 func eventMetric(orig ancestor.Metric, seq idx.Event) ancestor.Metric {
-	metric := ancestor.Metric(piecefunc.Get(uint64(orig), eventMetricF))
+	metric := ancestor.Metric(eventMetricF(uint64(orig)))
 	// kick start metric in a beginning of epoch, when there's nothing to observe yet
 	if seq <= 2 && metric < 0.9*piecefunc.DecimalUnit {
 		metric += 0.1 * piecefunc.DecimalUnit
@@ -38,7 +38,7 @@ func eventMetric(orig ancestor.Metric, seq idx.Event) ancestor.Metric {
 	return metric
 }
 
-func (em *Emitter) isAllowedToEmit(e inter.EventPayloadI, metric ancestor.Metric, selfParent *inter.Event) bool {
+func (em *Emitter) isAllowedToEmit(e inter.EventI, eTxs bool, metric ancestor.Metric, selfParent *inter.Event) bool {
 	passedTime := e.CreationTime().Time().Sub(em.prevEmittedAtTime)
 	passedTimeIdle := e.CreationTime().Time().Sub(em.prevIdleTime)
 	if em.stakeRatio[e.Creator()] < 0.35*piecefunc.DecimalUnit {
@@ -99,7 +99,7 @@ func (em *Emitter) isAllowedToEmit(e inter.EventPayloadI, metric ancestor.Metric
 	{
 		if passedTime < em.intervals.Max &&
 			em.idle() &&
-			len(e.Txs()) == 0 {
+			!eTxs {
 			return false
 		}
 	}
@@ -114,7 +114,7 @@ func (em *Emitter) isAllowedToEmit(e inter.EventPayloadI, metric ancestor.Metric
 		}
 		if adjustedPassedIdleTime < em.intervals.Confirming &&
 			!em.idle() &&
-			len(e.Txs()) == 0 {
+			!eTxs {
 			return false
 		}
 	}

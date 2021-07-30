@@ -2,6 +2,7 @@ package emitter
 
 import (
 	"errors"
+	"math/big"
 	"sync"
 
 	"github.com/Fantom-foundation/lachesis-base/hash"
@@ -30,6 +31,7 @@ type (
 
 		Check(e *inter.EventPayload, parents inter.Events) error
 		Process(*inter.EventPayload) error
+		Broadcast(*inter.EventPayload)
 		Build(*inter.MutableEventPayload, func()) error
 		DagIndex() *vecmt.Index
 
@@ -61,6 +63,7 @@ type Reader interface {
 	GetHeads(idx.Epoch) hash.Events
 	GetGenesisTime() inter.Timestamp
 	GetRules() opera.Rules
+	GetRecommendedGasPrice() *big.Int
 }
 
 type TxPool interface {
@@ -74,4 +77,7 @@ type TxPool interface {
 	// SubscribeNewTxsNotify should return an event subscription of
 	// NewTxsNotify and send events to the given channel.
 	SubscribeNewTxsNotify(chan<- evmcore.NewTxsNotify) notify.Subscription
+
+	// Count returns the total number of transactions
+	Count() int
 }

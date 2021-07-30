@@ -13,7 +13,6 @@ import (
 	"github.com/Fantom-foundation/lachesis-base/inter/pos"
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -27,7 +26,6 @@ import (
 	"github.com/Fantom-foundation/go-opera/ethapi"
 	"github.com/Fantom-foundation/go-opera/evmcore"
 	"github.com/Fantom-foundation/go-opera/gossip/blockproc"
-	"github.com/Fantom-foundation/go-opera/gossip/gasprice"
 	"github.com/Fantom-foundation/go-opera/gossip/sfcapi"
 	"github.com/Fantom-foundation/go-opera/inter"
 	"github.com/Fantom-foundation/go-opera/inter/drivertype"
@@ -42,7 +40,6 @@ type EthAPIBackend struct {
 	extRPCEnabled       bool
 	svc                 *Service
 	state               *EvmStateReader
-	gpo                 *gasprice.Oracle
 	allowUnprotectedTxs bool
 }
 
@@ -213,7 +210,7 @@ func (b *EthAPIBackend) GetHeads(ctx context.Context, epoch rpc.BlockNumber) (he
 	}
 
 	if requested == current {
-		heads = b.svc.store.GetHeads(requested)
+		heads = b.svc.store.GetHeadsSlice(requested)
 	} else {
 		err = errors.New("heads for previous epochs are not available")
 		return
@@ -326,7 +323,6 @@ func (b *EthAPIBackend) GetTd(_ common.Hash) *big.Int {
 }
 
 func (b *EthAPIBackend) GetEVM(ctx context.Context, msg evmcore.Message, state *state.StateDB, header *evmcore.EvmHeader, vmConfig *vm.Config) (*vm.EVM, func() error, error) {
-	state.SetBalance(msg.From(), math.MaxBig256)
 	vmError := func() error { return nil }
 
 	if vmConfig == nil {
@@ -439,7 +435,7 @@ func (b *EthAPIBackend) Progress() ethapi.PeerProgress {
 }
 
 func (b *EthAPIBackend) SuggestPrice(ctx context.Context) (*big.Int, error) {
-	return b.gpo.SuggestPrice(ctx)
+	return b.svc.gpo.SuggestPrice(), nil
 }
 
 func (b *EthAPIBackend) ChainDb() ethdb.Database {

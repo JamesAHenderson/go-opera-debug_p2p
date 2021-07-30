@@ -44,6 +44,18 @@ func (m *MockExternal) EXPECT() *MockExternalMockRecorder {
 	return m.recorder
 }
 
+// Broadcast mocks base method
+func (m *MockExternal) Broadcast(arg0 *inter.EventPayload) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "Broadcast", arg0)
+}
+
+// Broadcast indicates an expected call of Broadcast
+func (mr *MockExternalMockRecorder) Broadcast(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Broadcast", reflect.TypeOf((*MockExternal)(nil).Broadcast), arg0)
+}
+
 // Build mocks base method
 func (m *MockExternal) Build(arg0 *inter.MutableEventPayload, arg1 func()) error {
 	m.ctrl.T.Helper()
@@ -185,6 +197,20 @@ func (mr *MockExternalMockRecorder) GetLatestBlockIndex() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLatestBlockIndex", reflect.TypeOf((*MockExternal)(nil).GetLatestBlockIndex))
 }
 
+// GetRecommendedGasPrice mocks base method
+func (m *MockExternal) GetRecommendedGasPrice() *big.Int {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetRecommendedGasPrice")
+	ret0, _ := ret[0].(*big.Int)
+	return ret0
+}
+
+// GetRecommendedGasPrice indicates an expected call of GetRecommendedGasPrice
+func (mr *MockExternalMockRecorder) GetRecommendedGasPrice() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRecommendedGasPrice", reflect.TypeOf((*MockExternal)(nil).GetRecommendedGasPrice))
+}
+
 // GetRules mocks base method
 func (m *MockExternal) GetRules() opera.Rules {
 	m.ctrl.T.Helper()
@@ -300,6 +326,20 @@ func NewMockTxPool(ctrl *gomock.Controller) *MockTxPool {
 // EXPECT returns an object that allows the caller to indicate expected use
 func (m *MockTxPool) EXPECT() *MockTxPoolMockRecorder {
 	return m.recorder
+}
+
+// Count mocks base method
+func (m *MockTxPool) Count() int {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Count")
+	ret0, _ := ret[0].(int)
+	return ret0
+}
+
+// Count indicates an expected call of Count
+func (mr *MockTxPoolMockRecorder) Count() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Count", reflect.TypeOf((*MockTxPool)(nil).Count))
 }
 
 // Has mocks base method
