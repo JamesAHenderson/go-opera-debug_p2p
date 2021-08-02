@@ -20,9 +20,11 @@ import (
 	"context"
 	"errors"
 	"math/big"
+	"math/rand"
 
 	"github.com/Fantom-foundation/lachesis-base/hash"
 	"github.com/Fantom-foundation/lachesis-base/inter/idx"
+	"github.com/beorn7/perks/histogram"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -94,9 +96,47 @@ func newFilter(backend Backend, addresses []common.Address, topics [][]common.Ha
 	}
 }
 
+var statsTopics = histogram.New(20)
+var statsUnindexedBlocks = histogram.New(20)
+var statsIndexedBlocks = histogram.New(20)
+var maxLogs = histogram.New(20)
+
 // Logs searches the blockchain for matching log entries, returning all from the
 // first block that contains matches, updating the start of the filter accordingly.
 func (f *Filter) Logs(ctx context.Context) ([]*types.Log, error) {
+	begin := f.begin
+	withStat := func(res []*types.Log, err error) ([]*types.Log, error) {
+		if err != nil {
+			return res, err
+		}
+		if len(f.topics) != 0 {
+			statsIndexedBlocks.Insert(float64(f.end-begin))
+		} else {
+			statsUnindexedBlocks.Insert(float64(f.end-begin))
+		}
+		statsTopics.Insert(float64(len(f.topics)))
+		maxLogs.Insert(float64(len(res)))
+		if rand.Intn(100) == 0 {
+			println("topics count")
+			for _, bin := range statsTopics.Bins() {
+				println(int(bin.Mean()), "->", bin.Count)
+			}
+			println("blocks count for unindexed requests")
+			for _, bin := range statsUnindexedBlocks.Bins() {
+				println(int(bin.Mean()), "->", bin.Count)
+			}
+			println("blocks count for indexed requests")
+			for _, bin := range statsIndexedBlocks.Bins() {
+				println(int(bin.Mean()), "->", bin.Count)
+			}
+			println("logs count")
+			for _, bin := range maxLogs.Bins() {
+				println(int(bin.Mean()), "->", bin.Count)
+			}
+		}
+		return res, nil
+	}
+
 	// If we're doing singleton block filtering, execute and return
 	if f.block != common.Hash(hash.Zero) {
 		header, err := f.backend.HeaderByHash(ctx, f.block)
@@ -106,7 +146,7 @@ func (f *Filter) Logs(ctx context.Context) ([]*types.Log, error) {
 		if header == nil {
 			return nil, errors.New("unknown block")
 		}
-		return f.blockLogs(ctx, header)
+		return withStat(f.blockLogs(ctx, header))
 	}
 	// Figure out the limits of the filter range
 	header, _ := f.backend.HeaderByNumber(ctx, rpc.LatestBlockNumber)
@@ -118,16 +158,17 @@ func (f *Filter) Logs(ctx context.Context) ([]*types.Log, error) {
 	if f.begin == -1 {
 		f.begin = int64(head)
 	}
+	begin = f.begin
 	end := uint64(f.end)
 	if f.end == -1 {
 		end = head
 	}
 
 	if isEmpty(f.topics) {
-		return f.unindexedLogs(ctx, int64(end))
+		return withStat(f.unindexedLogs(ctx, int64(end)))
 	}
 
-	return f.indexedLogs(ctx, idx.Block(f.begin), idx.Block(end))
+	return withStat(f.indexedLogs(ctx, idx.Block(f.begin), idx.Block(end)))
 }
 
 // indexedLogs returns the logs matching the filter criteria based on topics index.
