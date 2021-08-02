@@ -21,6 +21,7 @@ import (
 	"errors"
 	"math/big"
 	"math/rand"
+	"sync"
 
 	"github.com/Fantom-foundation/lachesis-base/hash"
 	"github.com/Fantom-foundation/lachesis-base/inter/idx"
@@ -100,6 +101,7 @@ var statsTopics = histogram.New(20)
 var statsUnindexedBlocks = histogram.New(20)
 var statsIndexedBlocks = histogram.New(20)
 var maxLogs = histogram.New(20)
+var stasMu = sync.Mutex{}
 
 // Logs searches the blockchain for matching log entries, returning all from the
 // first block that contains matches, updating the start of the filter accordingly.
@@ -109,10 +111,12 @@ func (f *Filter) Logs(ctx context.Context) ([]*types.Log, error) {
 		if err != nil {
 			return res, err
 		}
+		stasMu.Lock()
+		defer stasMu.Unlock()
 		if len(f.topics) != 0 {
-			statsIndexedBlocks.Insert(float64(f.end-begin))
+			statsIndexedBlocks.Insert(float64(f.end - begin))
 		} else {
-			statsUnindexedBlocks.Insert(float64(f.end-begin))
+			statsUnindexedBlocks.Insert(float64(f.end - begin))
 		}
 		statsTopics.Insert(float64(len(f.topics)))
 		maxLogs.Insert(float64(len(res)))
