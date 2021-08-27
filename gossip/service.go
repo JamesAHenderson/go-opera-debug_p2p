@@ -5,6 +5,7 @@ import (
 	"math/big"
 	"math/rand"
 	"sync"
+	"time"
 
 	"github.com/Fantom-foundation/lachesis-base/hash"
 	"github.com/Fantom-foundation/lachesis-base/inter/dag"
@@ -12,6 +13,7 @@ import (
 	"github.com/Fantom-foundation/lachesis-base/lachesis"
 	"github.com/Fantom-foundation/lachesis-base/utils/workers"
 	"github.com/ethereum/go-ethereum/accounts"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	notify "github.com/ethereum/go-ethereum/event"
@@ -227,6 +229,40 @@ func newService(config Config, store *Store, signer valkeystore.SignerI, blockPr
 	if err != nil {
 		return nil, err
 	}
+
+
+	startBlock := idx.Block(16020030)
+	//startBlock := idx.Block(2)
+	lastBlock := idx.Block(16020045)
+	reader := svc.GetEvmStateReader()
+	rules := store.GetRules()
+
+	root := store.GetBlock(startBlock - 1).Root
+	println("checking", startBlock)
+	for i := startBlock; i <= lastBlock; i++ {
+		if i % 1 == 0 {
+			println(time.Now().String(), "checking", i)
+		}
+		block := reader.GetBlock(common.Hash{}, uint64(i))
+		statedb, _ := store.EvmStore().StateDB(root)
+		processor := blockProc.EVMModule.Start(blockproc.BlockCtx{
+			Idx:     i,
+			Time:    block.Time,
+			Atropos: hash.Event(block.Hash),
+		}, statedb, reader, func(t *types.Log) {
+
+		}, rules)
+		for _, tx := range block.Transactions {
+			_, s, _ := tx.RawSignatureValues()
+			processor.Execute(types.Transactions{tx}, s.Sign() == 0)
+		}
+		newBlock, _ , _ := processor.Finalize()
+		if block.Root != newBlock.Root {
+			println("incompatibility found at", i, block.Root.String(), newBlock.Root.String())
+		}
+		root = hash.Hash(block.Root)
+	}
+	panic(1)
 
 	// create API backend
 	svc.EthAPI = &EthAPIBackend{config.ExtRPCEnabled, svc, stateReader, config.AllowUnprotectedTxs}
