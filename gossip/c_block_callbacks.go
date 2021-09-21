@@ -19,12 +19,12 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/Fantom-foundation/go-opera/evmcore"
-	"github.com/Fantom-foundation/go-opera/gossip/blockproc"
 	"github.com/Fantom-foundation/go-opera/gossip/blockproc/verwatcher"
 	"github.com/Fantom-foundation/go-opera/gossip/emitter"
 	"github.com/Fantom-foundation/go-opera/gossip/evmstore"
 	"github.com/Fantom-foundation/go-opera/gossip/sfcapi"
 	"github.com/Fantom-foundation/go-opera/inter"
+	"github.com/Fantom-foundation/go-opera/inter/iblockproc"
 	"github.com/Fantom-foundation/go-opera/opera"
 	"github.com/Fantom-foundation/go-opera/utils"
 )
@@ -85,12 +85,22 @@ func consensusCallbackBeginBlockFn(
 		if err != nil {
 			log.Crit("Failed to open StateDB", "err", err)
 		}
+		evmStateReader := &EvmStateReader{
+			ServiceFeed: feed,
+			store:       store,
+		}
 
 		eventProcessor := blockProc.EventsModule.Start(bs, es)
 
 		atroposTime := bs.LastBlock.Time + 1
 		atroposDegenerate := true
+		// events with txs
 		confirmedEvents := make(hash.OrderedEvents, 0, 3*es.Validators.Len())
+
+		mpsCheatersMap := make(map[idx.ValidatorID]struct{})
+		reportCheater := func(reporter, cheater idx.ValidatorID) {
+			mpsCheatersMap[cheater] = struct{}{}
+		}
 
 		return lachesis.BlockCallbacks{
 			ApplyEvent: func(_e dag.Event) {
@@ -99,9 +109,47 @@ func consensusCallbackBeginBlockFn(
 					atroposTime = e.MedianTime()
 					atroposDegenerate = false
 				}
-				if !e.NoTxs() {
-					// non-empty events only
+				if e.AnyTxs() {
 					confirmedEvents = append(confirmedEvents, e.ID())
+				}
+				if e.AnyMisbehaviourProofs() {
+					mps := store.GetEventPayload(e.ID()).MisbehaviourProofs()
+					for _, mp := range mps {
+						// self-contained parts of proofs are already checked by the checkers
+						if proof := mp.BlockVoteDoublesign; proof != nil {
+							reportCheater(e.Creator(), proof.Pair[0].EventLocator.Creator)
+						}
+						if proof := mp.EpochVoteDoublesign; proof != nil {
+							reportCheater(e.Creator(), proof.Pair[0].EventLocator.Creator)
+						}
+						if proof := mp.EventsDoublesign; proof != nil {
+							reportCheater(e.Creator(), proof.Pair[0].EventLocator.Creator)
+						}
+						if proof := mp.WrongBlockVote; proof != nil {
+							firstBlockEpoch := store.FindBlockEpoch(proof.Votes.Start)
+							lastBlockEpoch := store.FindBlockEpoch(proof.Votes.LastBlock())
+							if firstBlockEpoch != lastBlockEpoch || firstBlockEpoch != proof.Votes.Epoch {
+								reportCheater(e.Creator(), proof.Votes.EventLocator.Creator)
+								continue
+							}
+							actualRecord := store.GetFullBlockRecord(proof.Block)
+							if actualRecord == nil {
+								continue
+							}
+							if proof.GetVote() != actualRecord.Hash() {
+								reportCheater(e.Creator(), proof.Votes.EventLocator.Creator)
+							}
+						}
+						if proof := mp.WrongEpochVote; proof != nil {
+							actualRecord := store.GetFullEpochRecord(proof.Votes.Epoch)
+							if actualRecord == nil {
+								continue
+							}
+							if proof.Votes.Vote != actualRecord.Hash() {
+								reportCheater(e.Creator(), proof.Votes.EventLocator.Creator)
+							}
+						}
+					}
 				}
 				eventProcessor.ProcessConfirmedEvent(e)
 				if emitter != nil {
@@ -112,7 +160,7 @@ func consensusCallbackBeginBlockFn(
 				if atroposTime <= bs.LastBlock.Time {
 					atroposTime = bs.LastBlock.Time + 1
 				}
-				blockCtx := blockproc.BlockCtx{
+				blockCtx := iblockproc.BlockCtx{
 					Idx:     bs.LastBlock.Idx + 1,
 					Time:    atroposTime,
 					Atropos: cBlock.Atropos,
@@ -131,6 +179,17 @@ func consensusCallbackBeginBlockFn(
 				skipBlock = skipBlock || (emptyBlock && blockCtx.Time < bs.LastBlock.Time+es.Rules.Blocks.MaxEmptyBlockSkipPeriod)
 				// Finalize the progress of eventProcessor
 				bs = eventProcessor.Finalize(blockCtx, skipBlock) // TODO: refactor to not mutate the bs, it is unclear
+				{                                                 // sort and merge MPs cheaters
+					mpsCheaters := make(lachesis.Cheaters, 0, len(mpsCheatersMap))
+					for vid := range mpsCheatersMap {
+						mpsCheaters = append(mpsCheaters, vid)
+					}
+					sort.Slice(mpsCheaters, func(i, j int) bool {
+						a, b := mpsCheaters[i], mpsCheaters[j]
+						return a < b
+					})
+					bs.EpochCheaters = mergeCheaters(bs.EpochCheaters, mpsCheaters)
+				}
 				if skipBlock {
 					// save the latest block state even if block is skipped
 					store.SetBlockEpochState(bs, es)
@@ -141,10 +200,6 @@ func consensusCallbackBeginBlockFn(
 				sealer := blockProc.SealerModule.Start(blockCtx, bs, es)
 				sealing := sealer.EpochSealing()
 				txListener := blockProc.TxListenerModule.Start(blockCtx, bs, es, statedb)
-				evmStateReader := &EvmStateReader{
-					ServiceFeed: feed,
-					store:       store,
-				}
 				onNewLogAll := func(l *types.Log) {
 					txListener.OnNewLog(l)
 					if verWatcher != nil {
@@ -158,6 +213,7 @@ func consensusCallbackBeginBlockFn(
 				preInternalTxs := blockProc.PreTxTransactor.PopInternalTxs(blockCtx, bs, es, sealing, statedb)
 				preInternalReceipts := evmProcessor.Execute(preInternalTxs, true)
 				bs = txListener.Finalize()
+				bs.CheatersWritten = uint32(bs.EpochCheaters.Len()) // all cheaters should be written
 				for _, r := range preInternalReceipts {
 					if r.Status == 0 {
 						log.Warn("Pre-internal transaction reverted", "txid", r.TxHash.String())
@@ -268,12 +324,16 @@ func consensusCallbackBeginBlockFn(
 					}
 
 					bs.LastBlock = blockCtx
-					store.SetHistoryBlockEpochState(es.Epoch, bs, es)
-					store.SetEpochBlock(blockCtx.Idx+1, es.Epoch)
+					if sealing {
+						store.SetHistoryBlockEpochState(es.Epoch, bs, es)
+						store.SetEpochBlock(blockCtx.Idx+1, es.Epoch)
+					}
 					store.SetBlock(blockCtx.Idx, block)
 					store.SetBlockIndex(block.Atropos, blockCtx.Idx)
 					store.SetBlockEpochState(bs, es)
 					store.EvmStore().SetCachedEvmBlock(blockCtx.Idx, evmBlock)
+					updateLowestBlockToFill(blockCtx.Idx, store)
+					updateLowestEpochToFill(es.Epoch, store)
 
 					// Notify about new block and txs
 					if feed != nil {
