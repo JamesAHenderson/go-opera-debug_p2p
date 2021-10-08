@@ -211,8 +211,15 @@ func newService(config Config, store *Store, signer valkeystore.SignerI, blockPr
 	println(bs.EpochGas)
 	println(bs.EpochCheaters.Len())
 	println(bs.LastBlock.Time, bs.LastBlock.Idx, bs.LastBlock.Atropos.String())
-	for i := idx.Block(1); i < 1000; i++ {
-		println(bs.LastBlock.Idx - i, store.GetBlock(bs.LastBlock.Idx - i).Root.String())
+	//for i := idx.Block(1); i < 1000; i++ {
+	//	println(bs.LastBlock.Idx - i, store.GetBlock(bs.LastBlock.Idx - i).Root.String())
+	//}
+	for _, tx := range store.GetBlock(16020041).Txs {
+		println(tx.String())
+	}
+	println("internal")
+	for _, tx := range store.GetBlock(16020041).InternalTxs {
+		println(tx.String())
 	}
 	for _, st := range bs.ValidatorStates {
 		println("st")
@@ -225,10 +232,10 @@ func newService(config Config, store *Store, signer valkeystore.SignerI, blockPr
 		println(st.Originated.String())
 		println(st.Uptime)
 	}
-	for _, prof := range bs.NextValidatorProfiles.SortedArray() {
-		println("prof")
-		println(prof.ValidatorID, prof.Validator.PubKey.String(), prof.Validator.Weight.String())
-	}
+	//for _, prof := range bs.NextValidatorProfiles.SortedArray() {
+	//	println("prof")
+	//	println(prof.ValidatorID, prof.Validator.PubKey.String(), prof.Validator.Weight.String())
+	//}
 	println("es")
 	println(es.Epoch, es.EpochStart, es.PrevEpochStart, es.Rules.String(), es.EpochStart, es.EpochStateRoot.String(), es.Hash().String())
 	for _, st := range es.ValidatorStates {
@@ -236,10 +243,10 @@ func newService(config Config, store *Store, signer valkeystore.SignerI, blockPr
 		println(st.GasRefund)
 		println(st.PrevEpochEvent.String())
 	}
-	for _, prof := range es.ValidatorProfiles.SortedArray() {
-		println("prof")
-		println(prof.ValidatorID, prof.Validator.PubKey.String(), prof.Validator.Weight.String())
-	}
+	//for _, prof := range es.ValidatorProfiles.SortedArray() {
+	//	println("prof")
+	//	println(prof.ValidatorID, prof.Validator.PubKey.String(), prof.Validator.Weight.String())
+	//}
 
 	// create GPO
 	svc.gpo = gasprice.NewOracle(&GPOBackend{store}, svc.config.GPO)
