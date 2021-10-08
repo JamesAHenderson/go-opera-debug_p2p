@@ -12,6 +12,7 @@ import (
 	"github.com/Fantom-foundation/lachesis-base/lachesis"
 	"github.com/Fantom-foundation/lachesis-base/utils/workers"
 	"github.com/ethereum/go-ethereum/accounts"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	notify "github.com/ethereum/go-ethereum/event"
@@ -214,13 +215,6 @@ func newService(config Config, store *Store, signer valkeystore.SignerI, blockPr
 	//for i := idx.Block(1); i < 1000; i++ {
 	//	println(bs.LastBlock.Idx - i, store.GetBlock(bs.LastBlock.Idx - i).Root.String())
 	//}
-	for _, tx := range store.GetBlock(16020041).Txs {
-		println(tx.String())
-	}
-	println("internal")
-	for _, tx := range store.GetBlock(16020041).InternalTxs {
-		println(tx.String())
-	}
 	for _, st := range bs.ValidatorStates {
 		println("st")
 		println(st.LastBlock)
@@ -261,6 +255,9 @@ func newService(config Config, store *Store, signer valkeystore.SignerI, blockPr
 	stateReader := svc.GetEvmStateReader()
 	svc.txpool = evmcore.NewTxPool(config.TxPool, net.EvmChainConfig(), stateReader)
 
+	for _, tx := range stateReader.GetBlock(common.Hash(hash.Zero), 16020041).Transactions {
+		println(tx.Hash().String())
+	}
 	// init dialCandidates
 	dnsclient := dnsdisc.NewClient(dnsdisc.Config{})
 	var err error
