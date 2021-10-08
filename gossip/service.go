@@ -210,7 +210,7 @@ func newService(config Config, store *Store, signer valkeystore.SignerI, blockPr
 	println(bs.AdvanceEpochs)
 	println(bs.EpochGas)
 	println(bs.EpochCheaters.Len())
-	println(bs.LastBlock)
+	println(bs.LastBlock.Time, bs.LastBlock.Idx, bs.LastBlock.Atropos.String())
 	for _, st := range bs.ValidatorStates {
 		println("st")
 		println(st.LastBlock)
