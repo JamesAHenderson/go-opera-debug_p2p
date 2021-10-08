@@ -196,13 +196,46 @@ func newService(config Config, store *Store, signer valkeystore.SignerI, blockPr
 
 	// load epoch DB
 	svc.store.loadEpochStore(svc.store.GetEpoch())
-	es := svc.store.getEpochStore(svc.store.GetEpoch())
-	svc.dagIndexer.Reset(svc.store.GetValidators(), es.table.DagIndex, func(id hash.Event) dag.Event {
+	ees := svc.store.getEpochStore(svc.store.GetEpoch())
+	svc.dagIndexer.Reset(svc.store.GetValidators(), ees.table.DagIndex, func(id hash.Event) dag.Event {
 		return svc.store.GetEvent(id)
 	})
 	// load caches for mutable values to avoid race condition
 	svc.store.GetBlockEpochState()
 	svc.store.GetHighestLamport()
+
+	bs, es := svc.store.GetBlockEpochState()
+	println(bs.FinalizedStateRoot.String())
+	println(bs.DirtyRules.String())
+	println(bs.AdvanceEpochs)
+	println(bs.EpochGas)
+	println(bs.EpochCheaters.Len())
+	for _, st := range bs.ValidatorStates {
+		println("st")
+		println(st.LastBlock)
+		println(st.Cheater)
+		println(st.LastEvent.String())
+		println(st.DirtyGasRefund)
+		println(st.LastOnlineTime)
+		println(st.LastGasPowerLeft.String())
+		println(st.Originated.String())
+		println(st.Uptime)
+	}
+	for _, prof := range bs.NextValidatorProfiles.SortedArray() {
+		println("prof")
+		println(prof.ValidatorID, prof.Validator.PubKey.String(), prof.Validator.Weight)
+	}
+	println("es")
+	println(es.EpochStart, es.EpochStateRoot.String(), es.Hash().String())
+	for _, st := range es.ValidatorStates {
+		println("st")
+		println(st.GasRefund)
+		println(st.PrevEpochEvent.String())
+	}
+	for _, prof := range es.ValidatorProfiles.SortedArray() {
+		println("prof")
+		println(prof.ValidatorID, prof.Validator.PubKey.String(), prof.Validator.Weight)
+	}
 
 	// create GPO
 	svc.gpo = gasprice.NewOracle(&GPOBackend{store}, svc.config.GPO)
