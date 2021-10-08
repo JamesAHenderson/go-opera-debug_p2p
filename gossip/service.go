@@ -223,7 +223,7 @@ func newService(config Config, store *Store, signer valkeystore.SignerI, blockPr
 	}
 	for _, prof := range bs.NextValidatorProfiles.SortedArray() {
 		println("prof")
-		println(prof.ValidatorID, prof.Validator.PubKey.String(), prof.Validator.Weight)
+		println(prof.ValidatorID, prof.Validator.PubKey.String(), prof.Validator.Weight.String())
 	}
 	println("es")
 	println(es.EpochStart, es.EpochStateRoot.String(), es.Hash().String())
@@ -234,7 +234,7 @@ func newService(config Config, store *Store, signer valkeystore.SignerI, blockPr
 	}
 	for _, prof := range es.ValidatorProfiles.SortedArray() {
 		println("prof")
-		println(prof.ValidatorID, prof.Validator.PubKey.String(), prof.Validator.Weight)
+		println(prof.ValidatorID, prof.Validator.PubKey.String(), prof.Validator.Weight.String())
 	}
 
 	// create GPO
