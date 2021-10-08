@@ -210,6 +210,7 @@ func newService(config Config, store *Store, signer valkeystore.SignerI, blockPr
 	println(bs.AdvanceEpochs)
 	println(bs.EpochGas)
 	println(bs.EpochCheaters.Len())
+	println(bs.LastBlock)
 	for _, st := range bs.ValidatorStates {
 		println("st")
 		println(st.LastBlock)
@@ -226,7 +227,7 @@ func newService(config Config, store *Store, signer valkeystore.SignerI, blockPr
 		println(prof.ValidatorID, prof.Validator.PubKey.String(), prof.Validator.Weight.String())
 	}
 	println("es")
-	println(es.EpochStart, es.EpochStateRoot.String(), es.Hash().String())
+	println(es.Epoch, es.EpochStart, es.PrevEpochStart, es.Rules.String(), es.EpochStart, es.EpochStateRoot.String(), es.Hash().String())
 	for _, st := range es.ValidatorStates {
 		println("st")
 		println(st.GasRefund)
