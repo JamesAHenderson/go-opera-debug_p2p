@@ -38,6 +38,7 @@ func (s *Service) GetConsensusCallbacks() lachesis.ConsensusCallbacks {
 	return lachesis.ConsensusCallbacks{
 		BeginBlock: consensusCallbackBeginBlockFn(
 			s.blockProcTasks,
+			s.blockNotifyTasks,
 			&s.blockProcWg,
 			&s.blockBusyFlag,
 			s.store,
@@ -55,7 +56,8 @@ func (s *Service) GetConsensusCallbacks() lachesis.ConsensusCallbacks {
 // makes lachesis.BeginBlockFn.
 // Note that onBlockEnd would be run async.
 func consensusCallbackBeginBlockFn(
-	parallelTasks *workers.Workers,
+	blockProcTasks *workers.Workers,
+	blockNotifyTasks *workers.Workers,
 	wg *sync.WaitGroup,
 	blockBusyFlag *uint32,
 	store *Store,
@@ -274,14 +276,16 @@ func consensusCallbackBeginBlockFn(
 
 					// Notify about new block
 					if feed != nil {
-						feed.newBlock.Send(evmcore.ChainHeadNotify{Block: evmBlock})
-						var logs []*types.Log
-						for _, r := range allReceipts {
-							for _, l := range r.Logs {
-								logs = append(logs, l)
+						_ = blockNotifyTasks.Enqueue(func() {
+							feed.newBlock.Send(evmcore.ChainHeadNotify{Block: evmBlock})
+							var logs []*types.Log
+							for _, r := range allReceipts {
+								for _, l := range r.Logs {
+									logs = append(logs, l)
+								}
 							}
-						}
-						feed.newLogs.Send(logs)
+							feed.newLogs.Send(logs)
+						})
 					}
 
 					if onBlockEnd != nil {
@@ -298,7 +302,7 @@ func consensusCallbackBeginBlockFn(
 				if confirmedEvents.Len() != 0 {
 					atomic.StoreUint32(blockBusyFlag, 1)
 					wg.Add(1)
-					err := parallelTasks.Enqueue(func() {
+					err := blockProcTasks.Enqueue(func() {
 						defer atomic.StoreUint32(blockBusyFlag, 0)
 						defer wg.Done()
 						blockFn()

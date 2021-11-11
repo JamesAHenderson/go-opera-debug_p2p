@@ -124,10 +124,12 @@ type Service struct {
 	// version watcher
 	verWatcher *verwatcher.VerWarcher
 
-	blockProcWg        sync.WaitGroup
-	blockProcTasks     *workers.Workers
-	blockProcTasksDone chan struct{}
-	blockProcModules   BlockProc
+	blockProcWg      sync.WaitGroup
+	blockNotifyWg      sync.WaitGroup
+	blockProcTasks   *workers.Workers
+	blockNotifyTasks *workers.Workers
+	blocTasksDone    chan struct{}
+	blockProcModules BlockProc
 
 	blockBusyFlag uint32
 	eventBusyFlag uint32
@@ -174,21 +176,22 @@ func NewService(stack *node.Node, config Config, store *Store, signer valkeystor
 
 func newService(config Config, store *Store, signer valkeystore.SignerI, blockProc BlockProc, engine lachesis.Consensus, dagIndexer *vecmt.Index) (*Service, error) {
 	svc := &Service{
-		config:             config,
-		done:               make(chan struct{}),
-		blockProcTasksDone: make(chan struct{}),
-		Name:               fmt.Sprintf("Node-%d", rand.Int()),
-		store:              store,
-		engine:             engine,
-		blockProcModules:   blockProc,
-		dagIndexer:         dagIndexer,
-		engineMu:           new(sync.RWMutex),
-		uniqueEventIDs:     uniqueID{new(big.Int)},
-		Instance:           logger.New("gossip-service"),
-		eventsLogger:       NewEventsLogger(),
+		config:           config,
+		done:             make(chan struct{}),
+		blocTasksDone:    make(chan struct{}),
+		Name:             fmt.Sprintf("Node-%d", rand.Int()),
+		store:            store,
+		engine:           engine,
+		blockProcModules: blockProc,
+		dagIndexer:       dagIndexer,
+		engineMu:         new(sync.RWMutex),
+		uniqueEventIDs:   uniqueID{new(big.Int)},
+		Instance:         logger.New("gossip-service"),
+		eventsLogger:     NewEventsLogger(),
 	}
 
-	svc.blockProcTasks = workers.New(new(sync.WaitGroup), svc.blockProcTasksDone, 1)
+	svc.blockProcTasks = workers.New(new(sync.WaitGroup), svc.blocTasksDone, 1)
+	svc.blockNotifyTasks = workers.New(&svc.blockNotifyWg, svc.blocTasksDone, 4)
 
 	// load epoch DB
 	svc.store.loadEpochStore(svc.store.GetEpoch())
@@ -357,6 +360,7 @@ func (s *Service) Start() error {
 	StartENRUpdater(s, s.p2pServer.LocalNode())
 
 	s.blockProcTasks.Start(1)
+	s.blockNotifyTasks.Start(1)
 
 	s.pm.Start(s.p2pServer.MaxPeers)
 
@@ -370,6 +374,7 @@ func (s *Service) Start() error {
 // WaitBlockEnd waits until parallel block processing is complete (if any)
 func (s *Service) WaitBlockEnd() {
 	s.blockProcWg.Wait()
+	s.blockNotifyWg.Wait()
 }
 
 // Stop method invoked when the node terminates the service.
@@ -388,7 +393,8 @@ func (s *Service) Stop() error {
 	s.stopped = true
 
 	s.blockProcWg.Wait()
-	close(s.blockProcTasksDone)
+	close(s.blocTasksDone)
+	s.blockNotifyWg.Wait()
 	return s.store.Commit()
 }
 
