@@ -43,7 +43,8 @@ func (s *Store) migrations() *migration.Migration {
 		Next("tx hashes recovery", s.recoverTxHashes).
 		Next("DAG heads recovery", s.recoverHeadsStorage).
 		Next("DAG last events recovery", s.recoverLastEventsStorage).
-		Next("BlockState recovery", s.recoverBlockState)
+		Next("BlockState recovery", s.recoverBlockState).
+		Next("LLR recovery", s.recoverLLR)
 }
 
 func unsupportedMigration() error {
@@ -334,6 +335,19 @@ func (s *Store) recoverBlockState() error {
 		v1 = s.convertBlockEpochStateV0(v)
 		s.SetHistoryBlockEpochState(epoch, *v1.BlockState, *v1.EpochState)
 	}
+
+	return nil
+}
+
+func (s *Store) recoverLLR() error {
+	bs, es := s.GetBlockEpochState()
+	s.SetLlrState(LlrState{
+		LowestEpochToDecide: es.Epoch + 1,
+		LowestEpochToFill:   es.Epoch + 1,
+		LowestBlockToDecide: bs.LastBlock.Idx + 1,
+		LowestBlockToFill:   bs.LastBlock.Idx + 1,
+	})
+	s.FlushLlrState()
 
 	return nil
 }
