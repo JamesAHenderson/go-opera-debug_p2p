@@ -14,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/Fantom-foundation/go-opera/gossip/evmstore"
-	"github.com/Fantom-foundation/go-opera/gossip/sfcapi"
 	"github.com/Fantom-foundation/go-opera/logger"
 	"github.com/Fantom-foundation/go-opera/utils/adapters/snap2kvdb"
 	"github.com/Fantom-foundation/go-opera/utils/rlpstore"
@@ -31,7 +30,6 @@ type Store struct {
 	mainDB       kvdb.Store
 	snapshotedDB *switchable.Snapshot
 	evm          *evmstore.Store
-	sfcapi       *sfcapi.Store
 	table        struct {
 		Version kvdb.Store `table:"_"`
 
@@ -51,7 +49,6 @@ type Store struct {
 
 		// API-only
 		BlockHashes kvdb.Store `table:"B"`
-		SfcAPI      kvdb.Store `table:"S"`
 
 		LlrState           kvdb.Store `table:"!"`
 		LlrBlockResults    kvdb.Store `table:"@"`
@@ -121,7 +118,6 @@ func NewStore(dbs kvdb.FlushableDBProducer, cfg StoreConfig) *Store {
 
 	s.initCache()
 	s.evm = evmstore.NewStore(s.mainDB, cfg.EVM)
-	s.sfcapi = sfcapi.NewStore(s.table.SfcAPI)
 
 	if err := s.migrateData(); err != nil {
 		s.Log.Crit("Failed to migrate Gossip DB", "err", err)
@@ -158,7 +154,6 @@ func (s *Store) Close() {
 
 	_ = s.mainDB.Close()
 	s.async.Close()
-	s.sfcapi.Close()
 	_ = s.closeEpochStore()
 }
 
