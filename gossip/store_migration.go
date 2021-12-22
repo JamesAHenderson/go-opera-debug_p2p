@@ -252,6 +252,9 @@ func (s *Store) convertBlockEpochStateV0(oldEBS *BlockEpochStateV0) BlockEpochSt
 	cheatersWritten := 0
 	for i, vs := range oldBS.ValidatorStates {
 		lastEvent := s.GetEvent(vs.LastEvent)
+		if lastEvent == nil {
+			lastEvent = &inter.Event{}
+		}
 		newValidatorState[i] = iblockproc.ValidatorBlockState{
 			LastEvent: iblockproc.EventInfo{
 				ID:           vs.LastEvent,
@@ -299,6 +302,9 @@ func (s *Store) convertBlockEpochStateV0(oldEBS *BlockEpochStateV0) BlockEpochSt
 		newEs.ValidatorStates[i].GasRefund = v.GasRefund
 		newEs.ValidatorStates[i].PrevEpochEvent.ID = v.PrevEpochEvent
 		lastEvent := s.GetEvent(v.PrevEpochEvent)
+		if lastEvent == nil {
+			lastEvent = &inter.Event{}
+		}
 		newEs.ValidatorStates[i].PrevEpochEvent.Time = lastEvent.MedianTime()
 		newEs.ValidatorStates[i].PrevEpochEvent.GasPowerLeft = lastEvent.GasPowerLeft()
 	}
