@@ -608,9 +608,11 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 	}
 	// Ensure Opera-specific hard bounds
 	if pool.chain.MinGasPrice().Cmp(tx.GasPrice()) > 0 {
+		log.Warn("Discarding due to min gas price", "hash", tx.Hash(), "price", tx.GasPrice(), "min", pool.chain.MinGasPrice())
 		return ErrUnderpriced
 	}
 	if pool.chain.TxExists(tx.Hash()) {
+		log.Warn("Discarding as it already exists in the chain", "hash", tx.Hash())
 		return ErrUnderpriced
 	}
 	return nil
@@ -627,7 +629,7 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (replaced bool, err e
 	// If the transaction is already known, discard it
 	hash := tx.Hash()
 	if pool.all.Get(hash) != nil {
-		log.Trace("Discarding already known transaction", "hash", hash)
+		log.Warn("Discarding already known transaction", "hash", hash)
 		return false, ErrAlreadyKnown
 	}
 	// Make the local flag. If it's from local source or it's from the network but
@@ -636,7 +638,7 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (replaced bool, err e
 
 	// If the transaction fails basic validation, discard it
 	if err := pool.validateTx(tx, isLocal); err != nil {
-		log.Trace("Discarding invalid transaction", "hash", hash, "err", err)
+		log.Warn("Discarding invalid transaction", "hash", hash, "err", err)
 		invalidTxMeter.Mark(1)
 		return false, err
 	}
@@ -644,7 +646,7 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (replaced bool, err e
 	if uint64(pool.all.Count()+numSlots(tx)) > pool.config.GlobalSlots+pool.config.GlobalQueue {
 		// If the new transaction is underpriced, don't accept it
 		if !isLocal && pool.priced.Underpriced(tx) {
-			log.Trace("Discarding underpriced transaction", "hash", hash, "price", tx.GasPrice())
+			log.Warn("Discarding underpriced transaction", "hash", hash, "price", tx.GasPrice())
 			underpricedTxMeter.Mark(1)
 			return false, ErrUnderpriced
 		}
@@ -655,13 +657,13 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (replaced bool, err e
 
 		// Special case, we still can't make the room for the new remote one.
 		if !isLocal && !success {
-			log.Trace("Discarding overflown transaction", "hash", hash)
+			log.Warn("Discarding overflown transaction", "hash", hash)
 			overflowedTxMeter.Mark(1)
 			return false, ErrTxPoolOverflow
 		}
 		// Kick out the underpriced remote transactions.
 		for _, tx := range drop {
-			log.Trace("Discarding freshly underpriced transaction", "hash", tx.Hash(), "price", tx.GasPrice())
+			log.Warn("Discarding freshly underpriced transaction", "hash", tx.Hash(), "price", tx.GasPrice())
 			underpricedTxMeter.Mark(1)
 			pool.removeTx(tx.Hash(), false)
 		}
@@ -673,6 +675,7 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (replaced bool, err e
 		inserted, old := list.Add(tx, pool.config.PriceBump)
 		if !inserted {
 			pendingDiscardMeter.Mark(1)
+			log.Warn("Discarding ErrReplaceUnderpriced", "hash", tx.Hash(), "price", tx.GasPrice())
 			return false, ErrReplaceUnderpriced
 		}
 		// New transaction is better, replace old one
@@ -724,6 +727,7 @@ func (pool *TxPool) enqueueTx(hash common.Hash, tx *types.Transaction, local boo
 	if !inserted {
 		// An older transaction was better, discard this
 		queuedDiscardMeter.Mark(1)
+		log.Warn("Discarding ErrReplaceUnderpriced", "hash", tx.Hash(), "price", tx.GasPrice())
 		return false, ErrReplaceUnderpriced
 	}
 	// Discard any previous transaction and mark this
@@ -855,6 +859,7 @@ func (pool *TxPool) addTxs(txs []*types.Transaction, local, sync bool) []error {
 		// If the transaction is known, pre-set the error slot
 		if pool.all.Get(tx.Hash()) != nil {
 			errs[i] = ErrAlreadyKnown
+			log.Warn("Discarding ErrAlreadyKnown", "hash", tx.Hash(), "price", tx.GasPrice())
 			continue
 		}
 		// Exclude transactions with invalid signatures as soon as
@@ -864,6 +869,7 @@ func (pool *TxPool) addTxs(txs []*types.Transaction, local, sync bool) []error {
 		if err != nil {
 			errs[i] = ErrInvalidSender
 			invalidTxMeter.Mark(1)
+			log.Warn("Discarding ErrInvalidSender", "hash", tx.Hash(), "price", tx.GasPrice())
 			continue
 		}
 		// Accumulate all unknown transactions for deeper processing
