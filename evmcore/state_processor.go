@@ -27,7 +27,8 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 
-	"github.com/Fantom-foundation/go-opera/utils/gsignercache"
+	"github.com/Fantom-foundation/go-opera/utils/signers/gsignercache"
+	"github.com/Fantom-foundation/go-opera/utils/signers/internaltx"
 )
 
 // StateProcessor is a basic Processor, which takes care of transitioning
@@ -55,7 +56,7 @@ func NewStateProcessor(config *params.ChainConfig, bc DummyChain) *StateProcesso
 // returns the amount of gas that was used in the process. If any of the
 // transactions failed to execute due to insufficient gas it will return an error.
 func (p *StateProcessor) Process(
-	block *EvmBlock, statedb *state.StateDB, cfg vm.Config, usedGas *uint64, internal bool, onNewLog func(*types.Log, *state.StateDB),
+	block *EvmBlock, statedb *state.StateDB, cfg vm.Config, usedGas *uint64, onNewLog func(*types.Log, *state.StateDB),
 ) (
 	receipts types.Receipts, allLogs []*types.Log, skipped []uint32, err error,
 ) {
@@ -73,13 +74,13 @@ func (p *StateProcessor) Process(
 	// Iterate over and process the individual transactions
 	for i, tx := range block.Transactions {
 		var msg types.Message
-		if !internal {
+		if !internaltx.IsInternal(tx) {
 			msg, err = tx.AsMessage(gsignercache.Wrap(types.MakeSigner(p.config, header.Number)), header.BaseFee)
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("could not apply tx %d [%v]: %w", i, tx.Hash().Hex(), err)
 			}
 		} else {
-			msg = types.NewMessage(common.Address{}, tx.To(), tx.Nonce(), tx.Value(), tx.Gas(), tx.GasPrice(), tx.GasFeeCap(), tx.GasTipCap(), tx.Data(), tx.AccessList(), true)
+			msg = types.NewMessage(internaltx.InternalSender(tx), tx.To(), tx.Nonce(), tx.Value(), tx.Gas(), tx.GasPrice(), tx.GasFeeCap(), tx.GasTipCap(), tx.Data(), tx.AccessList(), true)
 		}
 
 		statedb.Prepare(tx.Hash(), i)
