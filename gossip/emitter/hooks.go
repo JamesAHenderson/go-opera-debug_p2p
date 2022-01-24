@@ -66,6 +66,9 @@ func (em *Emitter) OnEventConnected(e inter.EventPayloadI) {
 		// event was emitted by me on another instance
 		em.onNewExternalEvent(e)
 	}
+	if e.Creator() == em.config.Validator.ID && e.AnyEpochVote() {
+		once = false
+	}
 	// if there was any challenge, erase it
 	delete(em.challenges, e.Creator())
 	// mark validator as online

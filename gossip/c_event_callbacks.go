@@ -182,6 +182,8 @@ func (s *Service) processEvent(e *inter.EventPayload) error {
 	atomic.StoreUint32(&s.eventBusyFlag, 1)
 	defer atomic.StoreUint32(&s.eventBusyFlag, 0)
 
+	llrs := s.store.GetLlrState()
+	println(llrs.LowestEpochToDecide, llrs.LowestEpochToFill)
 	// repeat the checks under the mutex which may depend on volatile data
 	if s.store.HasEvent(e.ID()) {
 		return eventcheck.ErrAlreadyConnectedEvent

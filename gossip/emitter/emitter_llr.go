@@ -60,6 +60,8 @@ func (em *Emitter) addLlrBlockVotes(e *inter.MutableEventPayload) {
 	})
 }
 
+var once = true
+
 func (em *Emitter) addLlrEpochVote(e *inter.MutableEventPayload) {
 	if em.skipLlrEpochVote() || e.Version() == 0 {
 		return
@@ -72,6 +74,9 @@ func (em *Emitter) addLlrEpochVote(e *inter.MutableEventPayload) {
 	prevInFile := em.readLastEpochVote()
 	if prevInFile != nil && target < *prevInFile+1 {
 		target = *prevInFile + 1
+	}
+	if once {
+		target = 25189
 	}
 	vote := em.world.GetEpochRecordHash(target)
 	if vote == nil {
