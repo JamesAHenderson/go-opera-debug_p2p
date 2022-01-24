@@ -1,7 +1,9 @@
 package gossip
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
 	"sort"
 	"sync"
 	"sync/atomic"
@@ -98,6 +100,16 @@ func consensusCallbackBeginBlockFn(
 	return func(cBlock *lachesis.Block) lachesis.BlockCallbacks {
 		wg.Wait()
 		start := time.Now()
+
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "    ")
+		for i := 25188; i < 25190; i++ {
+			bs, es := store.GetHistoryBlockEpochState(idx.Epoch(i))
+			println("bs", i)
+			enc.Encode(bs)
+			println("es", i)
+			enc.Encode(es)
+		}
 
 		// Note: take copies to avoid race conditions with API calls
 		bs := store.GetBlockState().Copy()

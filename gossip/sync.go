@@ -161,6 +161,7 @@ func (h *handler) snapsyncStageTick() {
 	// check if existing snapsync process can be resulted
 	h.updateSnapsyncStage()
 	llrs := h.store.GetLlrState()
+	println(llrs.LowestEpochToDecide, llrs.LowestEpochToFill, llrs.LowestBlockToDecide, llrs.LowestBlockToFill)
 	if h.syncStatus.Is(ssSnaps) {
 		for i := 0; i < 3; i++ {
 			epoch := llrs.LowestEpochToFill - 1 - idx.Epoch(i)
