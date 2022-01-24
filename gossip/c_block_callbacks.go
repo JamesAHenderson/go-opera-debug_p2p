@@ -103,12 +103,10 @@ func consensusCallbackBeginBlockFn(
 
 		enc := json.NewEncoder(os.Stdout)
 		enc.SetIndent("", "    ")
-		for i := 25188; i < 25190; i++ {
-			bs, es := store.GetHistoryBlockEpochState(idx.Epoch(i))
-			println("bs", i)
-			enc.Encode(bs)
-			println("es", i)
-			enc.Encode(es)
+		for i := 25188; i <= 25190; i++ {
+			er := store.GetFullEpochRecord(idx.Epoch(i))
+			println("er", i, er.Hash().String())
+			enc.Encode(er)
 		}
 
 		// Note: take copies to avoid race conditions with API calls
