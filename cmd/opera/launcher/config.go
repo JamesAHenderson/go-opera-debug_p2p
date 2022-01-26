@@ -196,7 +196,7 @@ func loadAllConfigs(file string, cfg *config) error {
 	return err
 }
 
-func getGenesisStore(ctx *cli.Context) *genesisstore.Store {
+func mayGetGenesisStore(ctx *cli.Context) *genesisstore.Store {
 	switch {
 	case ctx.GlobalIsSet(FakeNetFlag.Name):
 		_, num, err := parseFakeGen(ctx.GlobalString(FakeNetFlag.Name))
@@ -253,8 +253,6 @@ func getGenesisStore(ctx *cli.Context) *genesisstore.Store {
 			}
 		}
 		return genesisStore
-	default:
-		log.Crit("Network genesis is not specified")
 	}
 	return nil
 }
