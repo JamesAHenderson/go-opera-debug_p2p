@@ -48,7 +48,7 @@ func (em *Emitter) addLlrBlockVotes(e *inter.MutableEventPayload) {
 		records = append(records, *record)
 	}
 
-	waitUntilLongerBatch := !epochEnd && len(records) < basiccheck.MaxBlockVotesPerEvent
+	waitUntilLongerBatch := false && !epochEnd && len(records) < basiccheck.MaxBlockVotesPerEvent
 	if len(records) == 0 || waitUntilLongerBatch {
 		e.SetBlockVotes(emptyLlrBlockVotes)
 		return
