@@ -228,6 +228,9 @@ func (s *Service) processEvent(e *inter.EventPayload) error {
 		s.store.SetHighestLamport(e.Lamport())
 	}
 
+	llrs := s.store.GetLlrState()
+	println(llrs.LowestBlockToDecide, llrs.LowestBlockToFill, llrs.LowestEpochToDecide, llrs.LowestEpochToFill)
+
 	for _, em := range s.emitters {
 		em.OnEventConnected(e)
 	}
