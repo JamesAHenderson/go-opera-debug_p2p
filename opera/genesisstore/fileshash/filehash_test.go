@@ -161,7 +161,7 @@ func testFileHash_ReadWrite(t *testing.T, content []byte, expRoot hash.Hash, pie
 		maliciousReader := WrapReader(f, maxMemUsage, root)
 		data := make([]byte, contentPos+1)
 		err = ioread.ReadAll(maliciousReader, data)
-		require.ErrorIs(err, ErrHashMismatch)
+		require.Contains(err.Error(), ErrHashMismatch.Error())
 		require.NoError(maliciousReader.Close())
 
 		// restore
@@ -212,5 +212,23 @@ func testFileHash_ReadWrite(t *testing.T, content []byte, expRoot hash.Hash, pie
 		data := make([]byte, 1)
 		err = ioread.ReadAll(oomReader, data)
 		require.Errorf(err, "hashed file requires too much memory")
+	}
+
+	// try to truncate the file
+	{
+		// try to read
+		f, err = os.OpenFile(filePath, os.O_RDWR, 0600)
+		require.NoError(f.Truncate(rand.Int63n(int64(headerOffset) + int64(len(content)))))
+		maliciousReader := WrapReader(f, math.MaxUint64, root)
+		size := len(content)
+		if size == 0 {
+			// don't use empty buffer as it will always return nil
+			size++
+		}
+		data := make([]byte, size)
+		err = ioread.ReadAll(maliciousReader, data)
+		require.Error(err)
+		require.NotErrorIs(err, io.EOF)
+		require.NoError(maliciousReader.Close())
 	}
 }

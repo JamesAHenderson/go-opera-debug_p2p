@@ -19,6 +19,7 @@ var (
 	ErrHashMismatch = errors.New("hash mismatch")
 	ErrTooMuchMem   = errors.New("hashed file requires too much memory")
 	ErrInit         = errors.New("failed to init hashfile")
+	ErrPieceRead    = errors.New("failed to read piece")
 	ErrClosed       = errors.New("closed")
 )
 
@@ -124,7 +125,7 @@ func (r *Reader) readFromPiece(p []byte) (n int, err error) {
 		// switch to new piece
 		err := r.readNewPiece()
 		if err != nil {
-			return 0, err
+			return 0, fmt.Errorf("%v: %v", ErrPieceRead, err)
 		}
 	}
 	maxToRead := uint64(len(r.currentPiece))
