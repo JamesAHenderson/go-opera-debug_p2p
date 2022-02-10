@@ -3,6 +3,7 @@ package fileshash
 import (
 	"crypto/sha256"
 	"errors"
+	"fmt"
 	"io"
 	"math"
 
@@ -17,6 +18,7 @@ var (
 	ErrRootMismatch = errors.New("hashes root mismatch")
 	ErrHashMismatch = errors.New("hash mismatch")
 	ErrTooMuchMem   = errors.New("hashed file requires too much memory")
+	ErrInit         = errors.New("failed to init hashfile")
 	ErrClosed       = errors.New("closed")
 )
 
@@ -180,7 +182,7 @@ func (r *Reader) read(p []byte) (n int, err error) {
 	if r.hashes == nil {
 		err := r.init()
 		if err != nil {
-			return 0, err
+			return 0, fmt.Errorf("%v: %v", ErrInit, err)
 		}
 	}
 	if r.pos >= r.size {
