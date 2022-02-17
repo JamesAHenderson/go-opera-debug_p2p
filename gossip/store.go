@@ -173,8 +173,8 @@ func (s *Store) isCommitNeeded(sc, tc int) bool {
 		s.dbs.NotFlushedSizeEst() > size
 }
 
-// commitEVM commits EVM storage
-func (s *Store) commitEVM(flush bool) {
+// CommitEVM commits EVM storage
+func (s *Store) CommitEVM(flush bool) {
 	err := s.evm.Commit(s.GetBlockState(), flush)
 	if err != nil {
 		s.Log.Crit("Failed to commit EVM storage", "err", err)

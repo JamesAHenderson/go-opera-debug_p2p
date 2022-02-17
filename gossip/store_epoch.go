@@ -75,7 +75,11 @@ func (s *Store) getEpochStore(epoch idx.Epoch) *epochStore {
 	return es
 }
 
-func (s *Store) resetEpochStore(newEpoch idx.Epoch) {
+func (s *Store) GetDagIndexTable(epoch idx.Epoch) kvdb.Store {
+	return s.getEpochStore(epoch).table.DagIndex
+}
+
+func (s *Store) ResetEpochStore(newEpoch idx.Epoch) {
 	oldEs := s.epochStore.Load()
 	// create new DB
 	s.createEpochStore(newEpoch)

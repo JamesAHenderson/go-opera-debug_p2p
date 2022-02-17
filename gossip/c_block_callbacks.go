@@ -417,7 +417,7 @@ func consensusCallbackBeginBlockFn(
 						feed.newLogs.Send(logs)
 					}
 
-					store.commitEVM(false)
+					store.CommitEVM(false)
 					// Update the metrics touched during block commit
 					accountCommitTimer.Update(statedb.AccountCommits)
 					storageCommitTimer.Update(statedb.StorageCommits)

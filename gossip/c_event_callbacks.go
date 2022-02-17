@@ -122,7 +122,7 @@ func processLastEvent(lasts *concurrent.ValidatorEventsSet, e *inter.EventPayloa
 func (s *Service) switchEpochTo(newEpoch idx.Epoch) {
 	s.store.SetHighestLamport(0)
 	// reset dag indexer
-	s.store.resetEpochStore(newEpoch)
+	s.store.ResetEpochStore(newEpoch)
 	es := s.store.getEpochStore(newEpoch)
 	s.dagIndexer.Reset(s.store.GetValidators(), es.table.DagIndex, func(id hash.Event) dag.Event {
 		return s.store.GetEvent(id)
@@ -267,7 +267,7 @@ func (s *Service) commit(epochSealing bool) {
 	s.blockProcWg.Wait()
 	// TODO: prune old MPTs in beginnings of committed sections
 	if !s.store.cfg.EVM.Cache.TrieDirtyDisabled {
-		s.store.commitEVM(true)
+		s.store.CommitEVM(true)
 	}
 	_ = s.store.Commit()
 	if epochSealing {
