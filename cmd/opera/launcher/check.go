@@ -45,12 +45,12 @@ func checkEvm(ctx *cli.Context) error {
 	evmt := evms.EvmKvdbTable()
 
 	log.Info("Checking presence of a2f0ecd4129ca9d145d9945976d3e9616ba2c19f4971736c687b64317455244a")
-	b, err := evmt.Get(hexutils.HexToBytes("0xa2f0ecd4129ca9d145d9945976d3e9616ba2c19f4971736c687b64317455244a"))
+	b, err := evmt.Get(hexutils.HexToBytes("a2f0ecd4129ca9d145d9945976d3e9616ba2c19f4971736c687b64317455244a"))
 	if err != nil {
 		log.Crit("EvmKvdbTable lookup error", "err", err)
 	}
 	if b == nil {
-		log.Crit("Node is not found", "err", err)
+		log.Crit("Node is not found")
 	}
 	_, err = evms.StateDB(hash.HexToHash("0xa2f0ecd4129ca9d145d9945976d3e9616ba2c19f4971736c687b64317455244a"))
 	if err != nil {
