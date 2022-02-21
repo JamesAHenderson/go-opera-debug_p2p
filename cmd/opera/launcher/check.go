@@ -5,6 +5,7 @@ import (
 	"path"
 	"time"
 
+	"github.com/Fantom-foundation/lachesis-base/hash"
 	"github.com/Fantom-foundation/lachesis-base/inter/idx"
 	"github.com/Fantom-foundation/lachesis-base/kvdb/table"
 	"github.com/Fantom-foundation/lachesis-base/utils/simplewlru"
@@ -14,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/status-im/keycard-go/hexutils"
 	"gopkg.in/urfave/cli.v1"
 
 	"github.com/Fantom-foundation/go-opera/integration"
@@ -41,6 +43,22 @@ func checkEvm(ctx *cli.Context) error {
 	evms := gdb.EvmStore()
 	evmd := evms.EvmDatabase()
 	evmt := evms.EvmKvdbTable()
+
+	log.Info("Checking presence of a2f0ecd4129ca9d145d9945976d3e9616ba2c19f4971736c687b64317455244a")
+	b, err := evmt.Get(hexutils.HexToBytes("0xa2f0ecd4129ca9d145d9945976d3e9616ba2c19f4971736c687b64317455244a"))
+	if err != nil {
+		log.Crit("EvmKvdbTable lookup error", "err", err)
+	}
+	if b == nil {
+		log.Crit("Node is not found", "err", err)
+	}
+	_, err = evms.StateDB(hash.HexToHash("0xa2f0ecd4129ca9d145d9945976d3e9616ba2c19f4971736c687b64317455244a"))
+	if err != nil {
+		log.Crit("StateDB opening error", "err", err)
+	}
+	log.Info("OK")
+
+	return nil
 
 	start, reported := time.Now(), time.Now()
 
