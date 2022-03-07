@@ -9,11 +9,13 @@ import (
 
 	"github.com/Fantom-foundation/lachesis-base/abft"
 	"github.com/Fantom-foundation/lachesis-base/common/bigendian"
+	"github.com/Fantom-foundation/lachesis-base/hash"
 	"github.com/Fantom-foundation/lachesis-base/inter/idx"
 	"github.com/Fantom-foundation/lachesis-base/kvdb"
 	"github.com/Fantom-foundation/lachesis-base/kvdb/flushable"
 	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/rlp"
 	"gopkg.in/urfave/cli.v1"
 
 	"github.com/Fantom-foundation/go-opera/integration"
@@ -67,6 +69,13 @@ func fixDirty(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
+
+	// removing excessive events
+	log.Info("Removing excessive events")
+	gdb.ForEachEventRLP(epochIdx.Bytes(), func(id hash.Event, _ rlp.RawValue) bool {
+		gdb.DelEvent(id)
+		return true
+	})
 
 	// drop consensus database
 	log.Info("Removing lachesis db")
