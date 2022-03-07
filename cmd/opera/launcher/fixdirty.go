@@ -3,32 +3,31 @@ package launcher
 import (
 	"bytes"
 	"fmt"
-	"github.com/Fantom-foundation/go-opera/integration"
-	"github.com/Fantom-foundation/go-opera/vecmt"
+	"path"
+	"strings"
+	"time"
+
 	"github.com/Fantom-foundation/lachesis-base/abft"
 	"github.com/Fantom-foundation/lachesis-base/common/bigendian"
-	"github.com/Fantom-foundation/lachesis-base/hash"
-	"github.com/Fantom-foundation/lachesis-base/inter/dag"
 	"github.com/Fantom-foundation/lachesis-base/inter/idx"
 	"github.com/Fantom-foundation/lachesis-base/kvdb"
 	"github.com/Fantom-foundation/lachesis-base/kvdb/flushable"
 	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/log"
 	"gopkg.in/urfave/cli.v1"
-	"path"
-	"strings"
-	"time"
+
+	"github.com/Fantom-foundation/go-opera/integration"
 )
 
 var (
 	fixDirtyCommand = cli.Command{
 		Action:      utils.MigrateFlags(fixDirty),
 		Name:        "fixdirty",
-		Usage:       "Experimental - try to fix dirty db",
+		Usage:       "Experimental - try to fix dirty DB",
 		ArgsUsage:   "",
 		Flags:       append(nodeFlags, testFlags...),
 		Category:    "MISCELLANEOUS COMMANDS",
-		Description: `Experimental - try to fix dirty db.`,
+		Description: `Experimental - try to fix dirty DB.`,
 	}
 )
 
@@ -50,15 +49,17 @@ func fixDirty(ctx *cli.Context) error {
 	if blockState == nil || epochState == nil {
 		return fmt.Errorf("epoch %d is not available", epochIdx)
 	}
-	if ! gdb.EvmStore().HasStateDB(blockState.FinalizedStateRoot) {
+	if !gdb.EvmStore().HasStateDB(blockState.FinalizedStateRoot) {
 		return fmt.Errorf("state for epoch %d is not available", epochIdx)
 	}
 	// set the historic state to be the current
 	log.Info("Setting block epoch state")
 	gdb.SetBlockEpochState(*blockState, *epochState)
+	gdb.FlushBlockEpochState()
 
 	// Service.switchEpochTo
 	gdb.SetHighestLamport(0)
+	gdb.FlushHighestLamport()
 
 	// drop epoch databases
 	log.Info("Removing epoch dbs")
@@ -66,22 +67,6 @@ func fixDirty(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
-
-	// create new empty epoch database
-	log.Info("Recreating epoch db", "epoch", epochIdx)
-	gdb.ResetEpochStore(epochIdx)
-
-	// is this needed?
-	dagIndex := vecmt.NewIndex(panics("Vector clock"), cfg.VectorClock)
-	dagIndex.Reset(gdb.GetValidators(), gdb.GetDagIndexTable(epochIdx), func(id hash.Event) dag.Event {
-		return gdb.GetEvent(id)
-	})
-
-	// Service.commit
-	log.Info("Commit...")
-	gdb.CommitEVM(true)
-	_ = gdb.Commit()
-	gdb.CaptureEvmKvdbSnapshot()
 
 	// drop consensus database
 	log.Info("Removing lachesis db")
@@ -97,7 +82,7 @@ func fixDirty(ctx *cli.Context) error {
 	}
 	cdb := abft.NewStore(cMainDb, cGetEpochDB, panics("Lachesis store"), cfg.LachesisStore)
 	err = cdb.ApplyGenesis(&abft.Genesis{
-		Epoch: epochState.Epoch,
+		Epoch:      epochState.Epoch,
 		Validators: epochState.Validators,
 	})
 	if err != nil {
