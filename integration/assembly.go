@@ -182,6 +182,7 @@ func makeEngine(rawProducer kvdb.IterableDBProducer, inputGenesis InputGenesis, 
 	} else {
 		db = dbs
 	}
+	db = WrapDatabaseWithSummary(db)
 	gdb, cdb, genesisStore := getStores(db, cfg)
 	defer func() {
 		if err != nil {
