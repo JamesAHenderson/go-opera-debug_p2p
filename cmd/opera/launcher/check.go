@@ -1,6 +1,8 @@
 package launcher
 
 import (
+	"encoding/json"
+	"os"
 	"path"
 	"time"
 
@@ -28,6 +30,29 @@ func checkEvm(ctx *cli.Context) error {
 	}
 	defer gdb.Close()
 	evms := gdb.EvmStore()
+
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "    ")
+
+	a, b := gdb.GetHistoryBlockEpochState(93995)
+	from := a.LastBlock.Idx
+	println("====================================================================== block 93995")
+	enc.Encode(a)
+	println("====================================================================== epoch 93995")
+	enc.Encode(b)
+	a, b = gdb.GetHistoryBlockEpochState(93996)
+	until := a.LastBlock.Idx
+	println("====================================================================== block 93996")
+	enc.Encode(a)
+	println("====================================================================== epoch 93996")
+	enc.Encode(b)
+	println("======================================================================")
+
+	for b := from; b < until; b++ {
+		println(b, gdb.GetFullBlockRecord(b).Hash().String(), gdb.GetBlock(b).Root.String())
+	}
+
+	return nil
 
 	start, reported := time.Now(), time.Now()
 
