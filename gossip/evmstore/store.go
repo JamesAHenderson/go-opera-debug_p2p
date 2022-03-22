@@ -112,7 +112,7 @@ func (s *Store) GenerateEvmSnapshot(root common.Hash, rebuild, async bool) (err 
 		s.EvmDb,
 		s.EvmState.TrieDB(),
 		s.cfg.Cache.EvmSnap/opt.MiB,
-		root,
+		common.Hash{},
 		async,
 		rebuild,
 		false)
@@ -237,7 +237,7 @@ func (s *Store) Cap(max, min int) {
 
 // StateDB returns state database.
 func (s *Store) StateDB(from hash.Hash) (*state.StateDB, error) {
-	return state.NewWithSnapLayers(common.Hash(from), s.EvmState, s.Snaps, 0)
+	return state.NewWithSnapLayers(common.Hash(from), s.EvmState, nil, 0)
 }
 
 // HasStateDB returns if state database exists
