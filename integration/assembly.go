@@ -205,11 +205,11 @@ func makeEngine(rawProducer kvdb.IterableDBProducer, g *genesis.Genesis, emptySt
 // MakeEngine makes consensus engine from config.
 func MakeEngine(rawProducer kvdb.IterableDBProducer, g *genesis.Genesis, cfg Configs) (*abft.Lachesis, *vecmt.Index, *gossip.Store, *abft.Store, gossip.BlockProc) {
 	dropAllDBsIfInterrupted(rawProducer)
-	existingDBs := rawProducer.Names()
+	//existingDBs := rawProducer.Names()
 
-	engine, vecClock, gdb, cdb, blockProc, err := makeEngine(rawProducer, g, len(existingDBs) == 0, cfg)
+	engine, vecClock, gdb, cdb, blockProc, err := makeEngine(rawProducer, g, false, cfg)
 	if err != nil {
-		if len(existingDBs) == 0 {
+		if false {
 			dropAllDBs(rawProducer)
 		}
 		utils.Fatalf("Failed to make engine: %v", err)
@@ -217,7 +217,7 @@ func MakeEngine(rawProducer kvdb.IterableDBProducer, g *genesis.Genesis, cfg Con
 
 	rules := gdb.GetRules()
 	genesisID := gdb.GetGenesisID()
-	if len(existingDBs) == 0 {
+	if false {
 		log.Info("Applied genesis state", "name", rules.Name, "id", rules.NetworkID, "genesis", genesisID.String())
 	} else {
 		log.Info("Genesis is already written", "name", rules.Name, "id", rules.NetworkID, "genesis", genesisID.String())

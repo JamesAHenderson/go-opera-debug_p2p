@@ -4,19 +4,22 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"path"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/Fantom-foundation/go-opera/gossip"
 	"github.com/Fantom-foundation/lachesis-base/hash"
 	"github.com/Fantom-foundation/lachesis-base/inter/dag"
 	"github.com/Fantom-foundation/lachesis-base/kvdb"
+	"github.com/Fantom-foundation/lachesis-base/kvdb/backed"
 	"github.com/Fantom-foundation/lachesis-base/kvdb/leveldb"
 	"github.com/Fantom-foundation/lachesis-base/utils/cachescale"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/syndtr/goleveldb/leveldb/opt"
+
+	"github.com/Fantom-foundation/go-opera/gossip"
 )
 
 const (
@@ -153,9 +156,13 @@ func DBProducer(chaindataDir string, scale cachescale.Func) kvdb.IterableDBProdu
 		chaindataDir, _ = ioutil.TempDir("", "opera-integration")
 	}
 
-	return leveldb.NewProducer(chaindataDir, func(name string) int {
+	ldbDiff := leveldb.NewProducer(path.Join(chaindataDir, "diff"), func(name string) int {
 		return dbCacheSize(name, scale.I)
 	})
+	ldbBack := leveldb.NewProducer(path.Join(chaindataDir, "back"), func(name string) int {
+		return dbCacheSize(name, scale.I)
+	})
+	return backed.NewProducer(ldbDiff, ldbBack)
 }
 
 func CheckDBList(names []string) error {
@@ -204,6 +211,7 @@ func dropAllDBs(producer kvdb.IterableDBProducer) {
 }
 
 func dropAllDBsIfInterrupted(rawProducer kvdb.IterableDBProducer) {
+	return
 	names := rawProducer.Names()
 	if len(names) == 0 {
 		return
