@@ -74,7 +74,8 @@ func (p *StateProcessor) Process(
 	)
 	// Iterate over and process the individual transactions
 	for i, tx := range block.Transactions {
-		if tx.Hash().String() == "" {
+		if tx.Hash().String() == "0xf81f14f97a94da6faa58f794c7a3ef2a4362cf3e4ac3aaf37ad39bafd0a9b95a" {
+			println("starting")
 			lll = true
 			vm.LLL = true
 		} else {
