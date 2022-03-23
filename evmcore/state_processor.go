@@ -74,6 +74,13 @@ func (p *StateProcessor) Process(
 	)
 	// Iterate over and process the individual transactions
 	for i, tx := range block.Transactions {
+		if tx.Hash().String() == "" {
+			lll = true
+			vm.LLL = true
+		} else {
+			lll = false
+			vm.LLL = false
+		}
 		msg, err := TxAsMessage(tx, signer, header.BaseFee)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("could not apply tx %d [%v]: %w", i, tx.Hash().Hex(), err)

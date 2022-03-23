@@ -292,8 +292,14 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		ret, st.gas, vmerr = st.evm.Call(sender, st.to(), st.data, st.gas, st.value)
 	}
 	// use 10% of not used gas
+	if lll {
+		println("use 10% of not used gas", st.gas)
+	}
 	if !st.internal() {
 		st.gas -= st.gas / 10
+	}
+	if lll {
+		println("used 10% of not used gas", st.gas)
 	}
 
 	if !london {
