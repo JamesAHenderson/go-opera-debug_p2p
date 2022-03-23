@@ -156,7 +156,7 @@ func (h *handler) txsyncLoop() {
 
 func (h *handler) updateSnapsyncStage() {
 	// never allow fullsync while EVM snap is still generating, as it may lead to a race condition
-	snapGenOngoing, _ := h.store.evm.Snaps.Generating()
+	snapGenOngoing := false
 	fullsyncPossibleEver := h.store.evm.HasStateDB(h.store.GetBlockState().FinalizedStateRoot)
 	fullsyncPossibleNow := fullsyncPossibleEver && !snapGenOngoing
 	// never allow to stop fullsync as it may lead to a race condition due to overwritten EVM snapshot by snapsync
