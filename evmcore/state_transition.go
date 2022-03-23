@@ -293,13 +293,13 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	}
 	// use 10% of not used gas
 	if lll {
-		println("use 10% of not used gas", st.gas)
+		println("use 10% of not used gas", st.gas, st.gasUsed())
 	}
 	if !st.internal() {
 		st.gas -= st.gas / 10
 	}
 	if lll {
-		println("used 10% of not used gas", st.gas)
+		println("used 10% of not used gas", st.gas, st.gasUsed())
 	}
 
 	if !london {
@@ -308,6 +308,9 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	} else {
 		// After EIP-3529: refunds are capped to gasUsed / 5
 		st.refundGas(params.RefundQuotientEIP3529)
+	}
+	if lll {
+		println("refunded gas", st.gas, st.gasUsed())
 	}
 
 	return &ExecutionResult{
@@ -322,6 +325,9 @@ func (st *StateTransition) refundGas(refundQuotient uint64) {
 	refund := st.gasUsed() / refundQuotient
 	if refund > st.state.GetRefund() {
 		refund = st.state.GetRefund()
+	}
+	if lll {
+		println("refund", refund, st.state.GetRefund())
 	}
 	st.gas += refund
 
