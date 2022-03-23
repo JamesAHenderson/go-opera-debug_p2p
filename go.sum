@@ -419,6 +419,8 @@ github.com/uprendis/go-ethereum v1.9.7-0.20220323131505-40f9600126b8 h1:Qx/kmdl4
 github.com/uprendis/go-ethereum v1.9.7-0.20220323131505-40f9600126b8/go.mod h1:IeQDjWCNBj/QiWIPosfF6/kRC6pHPNs7W7LfBzjj+P4=
 github.com/uprendis/go-ethereum v1.9.7-0.20220323132006-35b6deacca46 h1:Hy1Z4i0GF5FFF6jVH2GxYUoGgQ4uMwxmkGx/a1og4yA=
 github.com/uprendis/go-ethereum v1.9.7-0.20220323132006-35b6deacca46/go.mod h1:IeQDjWCNBj/QiWIPosfF6/kRC6pHPNs7W7LfBzjj+P4=
+github.com/uprendis/go-ethereum v1.9.7-0.20220323160039-3d8623083478 h1:WQMGIUtEHAigAcvxIJ5XK95rYJ9Uiu1vAvJcXb8SwzE=
+github.com/uprendis/go-ethereum v1.9.7-0.20220323160039-3d8623083478/go.mod h1:IeQDjWCNBj/QiWIPosfF6/kRC6pHPNs7W7LfBzjj+P4=
 github.com/uprendis/lachesis-base v0.0.0-20220322185130-0a77955c450b h1:g/rAZ7kQ+yEnuIr4ei0nUjLSP4Z9SOKBjvY0zf8uwpM=
 github.com/uprendis/lachesis-base v0.0.0-20220322185130-0a77955c450b/go.mod h1:E6+2LOvgADwSOv0U5YXhRJz4PlX8qJxvq8M93AOC1tM=
 github.com/urfave/cli/v2 v2.3.0/go.mod h1:LJmUH05zAU44vOAcrfzZQKsZbVcdbOG8rtL3/XcUArI=
