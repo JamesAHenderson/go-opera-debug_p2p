@@ -26,6 +26,8 @@ func (b *batch) Replay(w kvdb.Writer) error {
 	return b.Batch.Replay(w)
 }
 
+func (db *Adapter) Drop() {}
+
 // NewBatch creates a write-only key-value store that buffers changes to its host
 // database until a final write is called.
 func (db *Adapter) NewBatch() kvdb.Batch {

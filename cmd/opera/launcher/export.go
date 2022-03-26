@@ -5,7 +5,6 @@ import (
 	"errors"
 	"io"
 	"os"
-	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -40,8 +39,8 @@ func exportEvents(ctx *cli.Context) error {
 
 	cfg := makeAllConfigs(ctx)
 
-	rawProducer := integration.DBProducer(path.Join(cfg.Node.DataDir, "chaindata"), cfg.cachescale)
-	gdb, err := makeRawGossipStore(rawProducer, cfg)
+	rawDbs := makeRawDbsProducer(cfg)
+	gdb, err := makeRawGossipStore(rawDbs, cfg)
 	if err != nil {
 		log.Crit("DB opening error", "datadir", cfg.Node.DataDir, "err", err)
 	}

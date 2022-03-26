@@ -18,7 +18,7 @@ require (
 	github.com/gballet/go-libpcsclite v0.0.0-20191108122812-4678299bea08 // indirect
 	github.com/getsentry/raven-go v0.2.0 // indirect
 	github.com/go-kit/kit v0.9.0 // indirect
-	github.com/golang/mock v1.3.1
+	github.com/golang/mock v1.6.0
 	github.com/hashicorp/golang-lru v0.5.5-0.20210104140557-80c98217689d
 	github.com/holiman/bloomfilter/v2 v2.0.3
 	github.com/julienschmidt/httprouter v1.3.0 // indirect
@@ -43,6 +43,8 @@ require (
 	golang.org/x/tools v0.1.5 // indirect
 	gopkg.in/urfave/cli.v1 v1.20.0
 )
+
+replace github.com/Fantom-foundation/lachesis-base => github.com/uprendis/lachesis-base v0.0.0-20220326234341-09cd68036624
 
 replace github.com/ethereum/go-ethereum => github.com/Fantom-foundation/go-ethereum v1.10.8-ftm-rc4
 

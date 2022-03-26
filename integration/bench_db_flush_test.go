@@ -9,10 +9,9 @@ import (
 	"github.com/Fantom-foundation/lachesis-base/hash"
 	"github.com/Fantom-foundation/lachesis-base/inter/idx"
 	"github.com/Fantom-foundation/lachesis-base/kvdb"
-	"github.com/Fantom-foundation/lachesis-base/kvdb/leveldb"
+	"github.com/Fantom-foundation/lachesis-base/kvdb/multidb"
 	"github.com/Fantom-foundation/lachesis-base/utils/cachescale"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/syndtr/goleveldb/leveldb/opt"
 
 	"github.com/Fantom-foundation/go-opera/gossip"
 	"github.com/Fantom-foundation/go-opera/integration/makefakegenesis"
@@ -22,16 +21,17 @@ import (
 )
 
 func BenchmarkFlushDBs(b *testing.B) {
-	rawProducer, dir := dbProducer("flush_bench")
+	rawProducers, dir := dbProducers("flush_bench")
 	defer os.RemoveAll(dir)
 	genStore := makefakegenesis.FakeGenesisStore(1, utils.ToFtm(1), utils.ToFtm(1))
 	g := genStore.Genesis()
-	_, _, store, s2, _ := MakeEngine(rawProducer, &g, Configs{
+	_, _, store, s2, _ := MakeEngine(rawProducers, &g, Configs{
 		Opera:         gossip.DefaultConfig(cachescale.Identity),
 		OperaStore:    gossip.DefaultStoreConfig(cachescale.Identity),
 		Lachesis:      abft.DefaultConfig(),
 		LachesisStore: abft.DefaultStoreConfig(cachescale.Identity),
 		VectorClock:   vecmt.DefaultConfig(cachescale.Identity),
+		DBs:           DefaultDBsConfig(cachescale.Identity.U64),
 	})
 	defer store.Close()
 	defer s2.Close()
@@ -65,14 +65,11 @@ func BenchmarkFlushDBs(b *testing.B) {
 	}
 }
 
-func cache64mb(string) int {
-	return 64 * opt.MiB
-}
-
-func dbProducer(name string) (kvdb.IterableDBProducer, string) {
+func dbProducers(name string) (map[multidb.TypeName]kvdb.IterableDBProducer, string) {
 	dir, err := ioutil.TempDir("", name)
 	if err != nil {
 		panic(err)
 	}
-	return leveldb.NewProducer(dir, cache64mb), dir
+	dbs, _ := SupportedDBs(dir, DefaultDBsCacheConfig(cachescale.Identity.U64))
+	return dbs, dir
 }

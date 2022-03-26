@@ -115,4 +115,30 @@ Checks EVM storage roots and code hashes
 			},
 		},
 	}
+	dbCommand = cli.Command{
+		Name:     "db",
+		Usage:    "Export blockchain",
+		Category: "MISCELLANEOUS COMMANDS",
+
+		Subcommands: []cli.Command{
+			{
+				Name:      "migrate",
+				Usage:     "Export blockchain events",
+				ArgsUsage: "<filename> [<epochFrom> <epochTo>]",
+				Action:    utils.MigrateFlags(dbMigrate),
+				Flags: []cli.Flag{
+					DataDirFlag,
+					configFileFlag,
+				},
+				Description: `
+    opera export events
+
+Requires a first argument of the file to write to.
+Optional second and third arguments control the first and
+last epoch to write. If the file ends with .gz, the output will
+be gzipped
+`,
+			},
+		},
+	}
 )
