@@ -124,13 +124,13 @@ func limitPattern(pattern [][]common.Hash) (limited [][]common.Hash, err error) 
 }
 
 func uniqOnly(hh []common.Hash) []common.Hash {
-	index := make(map[common.Hash]struct{}, len(hh))
+	used := make(map[common.Hash]struct{}, len(hh))
+	uniq := make([]common.Hash, 0, len(used))
 	for _, h := range hh {
-		index[h] = struct{}{}
-	}
-
-	uniq := make([]common.Hash, 0, len(index))
-	for h := range index {
+		if _, ok := used[h]; ok {
+			continue
+		}
+		used[h] = struct{}{}
 		uniq = append(uniq, h)
 	}
 	return uniq
@@ -144,7 +144,7 @@ func (tt *Index) MustPush(recs ...*types.Log) {
 	}
 }
 
-// Write log record to database.
+// Push log record to database.
 func (tt *Index) Push(recs ...*types.Log) error {
 	for _, rec := range recs {
 		var (
