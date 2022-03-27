@@ -409,7 +409,7 @@ func (b *EthAPIBackend) SuggestGasTipCap(ctx context.Context) (*big.Int, error) 
 }
 
 func (b *EthAPIBackend) ChainDb() ethdb.Database {
-	return b.svc.store.evm.EvmDb
+	return b.svc.store.evm.EvmDB
 }
 
 func (b *EthAPIBackend) AccountManager() *accounts.Manager {

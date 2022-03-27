@@ -42,7 +42,7 @@ type Store struct {
 		Txs         kvdb.Store `table:"X"`
 	}
 
-	EvmDb    ethdb.Database
+	EvmDB    ethdb.Database
 	EvmState state.Database
 	EvmLogs  *topicsdb.Index
 	Snaps    *snapshot.Tree
@@ -103,11 +103,11 @@ func (s *Store) initCache() {
 }
 
 func (s *Store) initEVMDB() {
-	s.EvmDb = rawdb.NewDatabase(
+	s.EvmDB = rawdb.NewDatabase(
 		kvdb2ethdb.Wrap(
 			nokeyiserr.Wrap(
 				s.table.Evm)))
-	s.EvmState = state.NewDatabaseWithConfig(s.EvmDb, &trie.Config{
+	s.EvmState = state.NewDatabaseWithConfig(s.EvmDB, &trie.Config{
 		Cache:     s.cfg.Cache.EvmDatabase / opt.MiB,
 		Journal:   s.cfg.Cache.TrieCleanJournal,
 		Preimages: s.cfg.EnablePreimageRecording,
@@ -131,7 +131,7 @@ func (s *Store) GenerateEvmSnapshot(root common.Hash, rebuild, async bool) (err 
 		return errors.New("EVM snapshot is already opened")
 	}
 	s.Snaps, err = snapshot.New(
-		s.EvmDb,
+		s.EvmDB,
 		s.EvmState.TrieDB(),
 		s.cfg.Cache.EvmSnap/opt.MiB,
 		root,
@@ -276,8 +276,8 @@ func (s *Store) IndexLogs(recs ...*types.Log) {
 	}
 }
 
-func (s *Store) Snapshots() *snapshot.Tree {
-	return s.Snaps
+func (s *Store) RawEvmDB() kvdb.Store {
+	return s.table.Evm
 }
 
 /*

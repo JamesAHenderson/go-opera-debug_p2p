@@ -240,7 +240,7 @@ func (b *GenesisBuilder) Build(head genesis.Header) *genesisstore.Store {
 			return buf, nil
 		}
 		if name == genesisstore.EvmSection {
-			it := b.tmpEvmStore.EvmDb.NewIterator(nil, nil)
+			it := b.tmpEvmStore.EvmDB.NewIterator(nil, nil)
 			defer it.Release()
 			_ = iodb.Write(buf, it)
 		}

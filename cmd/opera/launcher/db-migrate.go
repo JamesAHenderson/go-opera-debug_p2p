@@ -8,6 +8,7 @@ import (
 
 	"github.com/Fantom-foundation/lachesis-base/common/bigendian"
 	"github.com/Fantom-foundation/lachesis-base/kvdb"
+	"github.com/Fantom-foundation/lachesis-base/kvdb/batched"
 	"github.com/Fantom-foundation/lachesis-base/kvdb/cachedproducer"
 	"github.com/Fantom-foundation/lachesis-base/kvdb/flushable"
 	"github.com/Fantom-foundation/lachesis-base/kvdb/multidb"
@@ -284,11 +285,13 @@ func migrateComponent(datadir string, dbTypes, tmpDbTypes map[multidb.TypeName]k
 				if err != nil {
 					return err
 				}
+				newDB = batched.Wrap(newDB)
 				defer newDB.Close()
 				oldDB, err := dbTypes[e.Old.Type].OpenDB(e.Old.Name)
 				if err != nil {
 					return err
 				}
+				oldDB = batched.Wrap(oldDB)
 				defer oldDB.Close()
 				log.Info("Moving DB table", "req", e.Req, "old_db_type", e.Old.Type, "old_db_name", e.Old.Name, "old_table", e.Old.Table,
 					"new_db_type", e.New.Type, "new_db_name", e.New.Name, "new_table", e.New.Table)
@@ -327,6 +330,7 @@ func migrateComponent(datadir string, dbTypes, tmpDbTypes map[multidb.TypeName]k
 			if err != nil {
 				return err
 			}
+			newDB = batched.Wrap(newDB)
 			defer newDB.Close()
 			log.Info("Copying DB table", "req", e.Req, "old_db_type", e.Old.Type, "old_db_name", e.Old.Name, "old_table", e.Old.Table,
 				"new_db_type", e.New.Type, "new_db_name", "tmp/"+e.New.Name, "new_table", e.Old.Table)

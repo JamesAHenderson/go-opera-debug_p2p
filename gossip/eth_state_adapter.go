@@ -32,5 +32,5 @@ func (bc *ethBlockChain) ContractCode(hash common.Hash) ([]byte, error) {
 
 // Snapshots returns the blockchain snapshot tree to paused it during sync.
 func (bc *ethBlockChain) Snapshots() *snapshot.Tree {
-	return bc.store.LastKvdbEvmSnapshot().Snapshots()
+	return bc.store.LastKvdbEvmSnapshot().Snaps
 }

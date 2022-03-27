@@ -263,7 +263,7 @@ func exportGenesis(ctx *cli.Context) error {
 	if mode != "none" {
 		log.Info("Exporting EVM storage")
 		writer := wrapIntoHashFile(z, tmpPath, genesisstore.EvmSection)
-		it := gdb.EvmStore().EvmDb.NewIterator(nil, nil)
+		it := gdb.EvmStore().EvmDB.NewIterator(nil, nil)
 		if mode == "mpt" {
 			// iterate only over MPT data
 			it = mptIterator{it}

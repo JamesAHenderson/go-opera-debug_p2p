@@ -197,7 +197,7 @@ func pruneState(ctx *cli.Context) error {
 			return err
 		}
 	}
-	pruner, err := evmpruner.NewPruner(gdb.EvmStore().EvmDb, genesisRoot, root, tmpDir, bloom)
+	pruner, err := evmpruner.NewPruner(gdb.EvmStore().EvmDB, genesisRoot, root, tmpDir, bloom)
 	if err != nil {
 		log.Error("Failed to open snapshot tree", "err", err)
 		return err
@@ -254,7 +254,7 @@ func verifyState(ctx *cli.Context) error {
 			return err
 		}
 	}
-	if err := evmStore.Snapshots().Verify(root); err != nil {
+	if err := evmStore.Snaps.Verify(root); err != nil {
 		log.Error("Failed to verfiy state", "root", root, "err", err)
 		return err
 	}
@@ -276,7 +276,7 @@ func traverseState(ctx *cli.Context) error {
 	if gdb.GetGenesisID() == nil {
 		return errors.New("failed to open snapshot tree: genesis is not written")
 	}
-	chaindb := gdb.EvmStore().EvmDb
+	chaindb := gdb.EvmStore().EvmDB
 
 	if ctx.NArg() > 1 {
 		log.Error("Too many arguments given")
@@ -368,7 +368,7 @@ func traverseRawState(ctx *cli.Context) error {
 	if gdb.GetGenesisID() == nil {
 		return errors.New("failed to open snapshot tree: genesis is not written")
 	}
-	chaindb := gdb.EvmStore().EvmDb
+	chaindb := gdb.EvmStore().EvmDB
 
 	if ctx.NArg() > 1 {
 		log.Error("Too many arguments given")
