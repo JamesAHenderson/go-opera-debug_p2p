@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"github.com/Fantom-foundation/go-opera/integration/pebble"
 	"io/ioutil"
 	"path"
 	"strings"
@@ -54,6 +55,7 @@ func SupportedDBs(chaindataDir string, cfg DBCacheConfig) (map[multidb.TypeName]
 	}
 	return map[multidb.TypeName]kvdb.IterableDBProducer{
 		"leveldb": leveldb.NewProducer(path.Join(chaindataDir, "leveldb"), cacher),
+		"pebble": pebble.NewProducer(path.Join(chaindataDir, "pebble")),
 	}, nil
 }
 
