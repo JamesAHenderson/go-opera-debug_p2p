@@ -148,7 +148,9 @@ func (s *PublicEthereumAPI) FeeHistory(ctx context.Context, blockCount rpc.Decim
 	if blockCount > 1024 {
 		blockCount = 1024
 	}
+	println("&&##", blockCount)
 	for i, p := range rewardPercentiles {
+		println("++##", uint64(gasprice.DecimalUnit * p / 100.0))
 		if p < 0 || p > 100 {
 			return nil, fmt.Errorf("%w: %f", errInvalidPercentile, p)
 		}
@@ -177,7 +179,7 @@ func (s *PublicEthereumAPI) FeeHistory(ctx context.Context, blockCount rpc.Decim
 	for _, p := range rewardPercentiles {
 		ratio := tipScaleRatio(uint64(gasprice.DecimalUnit * p / 100.0))
 		scaledTip := scaleGasTip(goldTip, baseFee, ratio)
-		println(scaledTip.String(), ratio)
+		println("$$##", scaledTip.String(), ratio)
 		tips = append(tips, (*hexutil.Big)(scaledTip))
 	}
 	res.OldestBlock.ToInt().SetUint64(uint64(oldest))
