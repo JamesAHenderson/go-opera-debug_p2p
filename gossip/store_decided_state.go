@@ -4,6 +4,7 @@ import (
 	"github.com/Fantom-foundation/lachesis-base/inter/idx"
 	"github.com/Fantom-foundation/lachesis-base/inter/pos"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/Fantom-foundation/go-opera/inter/iblockproc"
 	"github.com/Fantom-foundation/go-opera/opera"
@@ -49,6 +50,11 @@ func (s *Store) GetHistoryBlockEpochState(epoch idx.Epoch) (*iblockproc.BlockSta
 	bs := v.BlockState.Copy()
 	es := v.EpochState.Copy()
 	return &bs, &es
+}
+
+func (s *Store) GetHistoryBlockEpochStateRLP(epoch idx.Epoch) rlp.RawValue {
+	b, _ := s.table.BlockEpochStateHistory.Get(epoch.Bytes())
+	return b
 }
 
 func (s *Store) GetHistoryEpochState(epoch idx.Epoch) *iblockproc.EpochState {

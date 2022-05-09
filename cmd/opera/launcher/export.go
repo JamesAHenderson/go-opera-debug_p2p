@@ -62,7 +62,7 @@ func exportEvents(ctx *cli.Context) error {
 		defer writer.(*gzip.Writer).Close()
 	}
 
-	from := idx.Epoch(1)
+	from := idx.Epoch(0)
 	if len(ctx.Args()) > 1 {
 		n, err := strconv.ParseUint(ctx.Args().Get(1), 10, 32)
 		if err != nil {
@@ -70,7 +70,7 @@ func exportEvents(ctx *cli.Context) error {
 		}
 		from = idx.Epoch(n)
 	}
-	to := idx.Epoch(0)
+	to := gdb.GetEpoch()
 	if len(ctx.Args()) > 2 {
 		n, err := strconv.ParseUint(ctx.Args().Get(2), 10, 32)
 		if err != nil {
@@ -124,12 +124,21 @@ func makeRawGossipStore(rawProducer kvdb.IterableDBProducer, cfg *config) (*goss
 
 // exportTo writer the active chain.
 func exportTo(w io.Writer, gdb *gossip.Store, from, to idx.Epoch) (err error) {
+	for e := from; e <= to; e++ {
+		_, err = w.Write(gdb.GetHistoryBlockEpochStateRLP(e))
+		if err != nil {
+			return
+		}
+	}
+
+	return
 	start, reported := time.Now(), time.Time{}
 
 	var (
 		counter int
 		last    hash.Event
 	)
+
 	gdb.ForEachEventRLP(from.Bytes(), func(id hash.Event, event rlp.RawValue) bool {
 		if to >= from && id.Epoch() > to {
 			return false
