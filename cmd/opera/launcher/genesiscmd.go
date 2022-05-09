@@ -195,6 +195,9 @@ func exportGenesis(ctx *cli.Context) error {
 				log.Warn("No epoch record", "epoch", i)
 				break
 			}
+			if i == to || i == to-1 {
+				println(er.EpochState.Rules.String())
+			}
 			b, _ := rlp.EncodeToBytes(ier.LlrIdxFullEpochRecord{
 				LlrFullEpochRecord: *er,
 				Idx:                i,
