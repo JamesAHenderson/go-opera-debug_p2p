@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"strconv"
+	"sync"
 
 	"github.com/klauspost/compress/zip"
 
@@ -437,20 +438,51 @@ func mergeGenesis(ctx *cli.Context) error {
 		if err != nil {
 			return err
 		}
-		buf := make([]byte, 32*1024)
+
+		buffersToRead := make(chan []byte, 10)
+		buffersToRead <- make([]byte, 32*1024)
+		buffersToRead <- make([]byte, 32*1024)
+		buffersToRead <- make([]byte, 32*1024)
+
+		buffersForWrite := make(chan struct {
+			b []byte
+			s int
+		}, 10)
+
+		wg := sync.WaitGroup{}
+		wg.Add(1)
+		quit := make(chan interface{})
+		go func() {
+			defer wg.Done()
+			for {
+				select {
+				case buf := <-buffersForWrite:
+					_, err = writer.Write(buf.b[:buf.s])
+					if err != nil {
+						panic(err)
+					}
+					buffersToRead <- buf.b
+				case <-quit:
+					return
+				}
+			}
+		}()
 		eof := false
 		for !eof {
+			buf := <-buffersToRead
 			n, err := reader.Read(buf)
 			if err == io.EOF {
 				eof = true
 			} else if err != nil {
 				return err
 			}
-			_, err = writer.Write(buf[:n])
-			if err != nil {
-				return err
-			}
+			buffersForWrite <- struct {
+				b []byte
+				s int
+			}{buf, n}
 		}
+		close(quit)
+		wg.Wait()
 		err = z.Flush()
 		if err != nil {
 			return err
