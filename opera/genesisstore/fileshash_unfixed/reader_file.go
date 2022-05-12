@@ -1,4 +1,4 @@
-package fileshash
+package fileshash_unfixed
 
 import (
 	"crypto/sha256"
@@ -24,7 +24,7 @@ var (
 )
 
 type Reader struct {
-	backend io.Reader
+	backend io.ReadCloser
 
 	size uint64
 	pos  uint64
@@ -41,7 +41,7 @@ type Reader struct {
 	err error
 }
 
-func WrapReader(backend io.Reader, maxMemUsage uint64, root hash.Hash) *Reader {
+func WrapReader(backend io.ReadCloser, maxMemUsage uint64, root hash.Hash) *Reader {
 	return &Reader{
 		backend:         backend,
 		pos:             0,
@@ -64,8 +64,7 @@ func (r *Reader) readHashes(n uint64) (hash.Hashes, error) {
 
 func calcHash(piece []byte) hash.Hash {
 	hasher := sha256.New()
-	hasher.Write(piece)
-	return hash.BytesToHash(hasher.Sum(nil))
+	return hash.BytesToHash(hasher.Sum(piece))
 }
 
 func calcHashesRoot(hashes hash.Hashes, pieceSize, size uint64) hash.Hash {
@@ -206,5 +205,5 @@ func (r *Reader) Read(p []byte) (n int, err error) {
 func (r *Reader) Close() error {
 	r.hashes = nil
 	r.err = ErrClosed
-	return r.backend.(io.Closer).Close()
+	return r.backend.Close()
 }

@@ -14,7 +14,7 @@ import (
 
 	"github.com/Fantom-foundation/go-opera/opera/genesis"
 	"github.com/Fantom-foundation/go-opera/opera/genesisstore/filelog"
-	"github.com/Fantom-foundation/go-opera/opera/genesisstore/fileshash"
+	"github.com/Fantom-foundation/go-opera/opera/genesisstore/fileshash_unfixed"
 	"github.com/Fantom-foundation/go-opera/opera/genesisstore/fileszip"
 	"github.com/Fantom-foundation/go-opera/utils/ioread"
 )
@@ -111,7 +111,7 @@ func OpenGenesisStore(rawReaders []fileszip.Reader, close func() error) (*Store,
 	for i, h := range hashes.RawEvmItems {
 		hashesMap[getSectionName(EvmSection, i)] = h
 	}
-	hashedMap := fileshash.Wrap(func(name string) (io.ReadCloser, error) {
+	hashedMap := fileshash_unfixed.Wrap(func(name string) (io.ReadCloser, error) {
 		// wrap with a logger
 		f, size, err := zipMap.Open(name)
 		if err != nil {

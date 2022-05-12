@@ -15,6 +15,7 @@ import (
 	"github.com/Fantom-foundation/lachesis-base/common/bigendian"
 	"github.com/klauspost/compress/zip"
 	gzip "github.com/klauspost/pgzip"
+	"github.com/syndtr/goleveldb/leveldb/opt"
 
 	"github.com/Fantom-foundation/lachesis-base/hash"
 	"github.com/Fantom-foundation/lachesis-base/inter/idx"
@@ -24,7 +25,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/syndtr/goleveldb/leveldb/opt"
 	"gopkg.in/urfave/cli.v1"
 
 	"github.com/Fantom-foundation/go-opera/gossip/evmstore"
@@ -34,6 +34,7 @@ import (
 	"github.com/Fantom-foundation/go-opera/opera/genesis"
 	"github.com/Fantom-foundation/go-opera/opera/genesisstore"
 	"github.com/Fantom-foundation/go-opera/opera/genesisstore/fileshash"
+	"github.com/Fantom-foundation/go-opera/opera/genesisstore/fileshash_unfixed"
 	"github.com/Fantom-foundation/go-opera/opera/genesisstore/fileszip"
 	utils2 "github.com/Fantom-foundation/go-opera/utils"
 	"github.com/Fantom-foundation/go-opera/utils/iodb"
@@ -81,7 +82,7 @@ func wrapIntoHashFile(backend *zip.Writer, tmpDirPath, name string) *fileshash.W
 		log.Crit("Zip file creation error", "err", err)
 	}
 	tmpI := 0
-	return fileshash.WrapWriter(zWriter, genesisstore.FilesHashPieceSize, 64*opt.GiB, func() fileshash.TmpWriter {
+	return fileshash.WrapWriter(zWriter, genesisstore.FilesHashPieceSize, func() fileshash.TmpWriter {
 		tmpI++
 		tmpPath := path.Join(tmpDirPath, fmt.Sprintf("genesis-%s-tmp-%d", name, tmpI))
 		_ = os.MkdirAll(tmpDirPath, os.ModePerm)
@@ -370,6 +371,24 @@ type GenesisUnitHeader struct {
 	Network  genesis.Header
 }
 
+func wrapIntoHashFile2(backend io.Writer, tmpDirPath, name string) *fileshash.Writer {
+	tmpI := 0
+	return fileshash.WrapWriter(backend, genesisstore.FilesHashPieceSize, func() fileshash.TmpWriter {
+		tmpI++
+		tmpPath := path.Join(tmpDirPath, fmt.Sprintf("genesis-%s-tmp-%d", name, tmpI))
+		_ = os.MkdirAll(tmpDirPath, os.ModePerm)
+		tmpFh, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, os.ModePerm)
+		if err != nil {
+			log.Crit("File opening error", "path", tmpPath, "err", err)
+		}
+		return dropableFile{
+			ReadWriteSeeker: tmpFh,
+			Closer:          tmpFh,
+			path:            tmpPath,
+		}
+	})
+}
+
 func mergeGenesis(ctx *cli.Context) error {
 	if len(ctx.Args()) < 5 {
 		utils.Fatalf("This command requires 5 arguments.")
@@ -391,6 +410,11 @@ func mergeGenesis(ctx *cli.Context) error {
 		return err
 	}
 	defer fh.Close()
+
+	cfg := makeAllConfigs(ctx)
+	tmpPath := path.Join(cfg.Node.DataDir, "tmp")
+	_ = os.RemoveAll(tmpPath)
+	defer os.RemoveAll(tmpPath)
 
 	writeSection := func(readerZip *fileszip.Map, name string, h hash.Hash) error {
 		// Write unit marker and version
@@ -418,7 +442,12 @@ func mergeGenesis(ctx *cli.Context) error {
 			return err
 		}
 		defer reader.Close()
-		writer := gzip.NewWriter(fh)
+
+		reader = fileshash_unfixed.WrapReader(reader, opt.GiB, h)
+
+		gWriter := gzip.NewWriter(fh)
+
+		writer := wrapIntoHashFile2(gWriter, tmpPath, name)
 
 		size := uint64(0)
 		buffersToRead := make(chan []byte, 10)
@@ -434,6 +463,7 @@ func mergeGenesis(ctx *cli.Context) error {
 		wg := sync.WaitGroup{}
 		wg.Add(1)
 		quit := make(chan interface{})
+		var newH hash.Hash
 		go func() {
 			defer wg.Done()
 			for {
@@ -445,7 +475,11 @@ func mergeGenesis(ctx *cli.Context) error {
 					}
 					buffersToRead <- buf.b
 				case <-quit:
-					err = writer.Flush()
+					newH, err = writer.Flush()
+					if err != nil {
+						panic(err)
+					}
+					err = gWriter.Flush()
 					if err != nil {
 						panic(err)
 					}
@@ -476,13 +510,13 @@ func mergeGenesis(ctx *cli.Context) error {
 			return err
 		}
 
-		println(dataStartPos, endPos, size)
+		println(newH.String(), dataStartPos, endPos, size)
 		_, err = fh.Seek(dataStartPos-(8+8+32), io.SeekStart)
 		if err != nil {
 			return err
 		}
 
-		_, err = fh.Write(h.Bytes())
+		_, err = fh.Write(newH.Bytes())
 		if err != nil {
 			return err
 		}

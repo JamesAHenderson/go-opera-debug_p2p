@@ -1,9 +1,7 @@
-package fileshash
+package fileshash_unfixed
 
 import (
-	"crypto/sha256"
 	"errors"
-	hasher "hash"
 	"io"
 
 	"github.com/Fantom-foundation/lachesis-base/common/bigendian"
@@ -18,16 +16,12 @@ type TmpWriter interface {
 	Drop() error
 }
 
-type tmpWriter struct {
-	TmpWriter
-	h hasher.Hash
-}
-
 type Writer struct {
 	backend io.Writer
 
 	openTmp    func() TmpWriter
-	tmps       []tmpWriter
+	tmps       []TmpWriter
+	tmpSize    uint64
 	tmpReadPos uint64
 
 	size uint64
@@ -35,11 +29,12 @@ type Writer struct {
 	pieceSize uint64
 }
 
-func WrapWriter(backend io.Writer, pieceSize uint64, openTmp func() TmpWriter) *Writer {
+func WrapWriter(backend io.Writer, pieceSize, tmpFileLen uint64, openTmp func() TmpWriter) *Writer {
 	return &Writer{
 		backend:   backend,
 		openTmp:   openTmp,
 		pieceSize: pieceSize,
+		tmpSize:   tmpFileLen,
 	}
 }
 
@@ -47,19 +42,15 @@ func (w *Writer) writeIntoTmp(p []byte) error {
 	if len(p) == 0 {
 		return nil
 	}
-	if w.size/w.pieceSize >= uint64(len(w.tmps)) {
-		w.tmps = append(w.tmps, tmpWriter{
-			TmpWriter: w.openTmp(),
-			h:         sha256.New(),
-		})
+	if w.size/w.tmpSize >= uint64(len(w.tmps)) {
+		w.tmps = append(w.tmps, w.openTmp())
 	}
-	currentPosInTmp := w.size % w.pieceSize
-	maxToWrite := w.pieceSize - currentPosInTmp
+	currentPosInTmp := w.size % w.tmpSize
+	maxToWrite := w.tmpSize - currentPosInTmp
 	if maxToWrite > uint64(len(p)) {
 		maxToWrite = uint64(len(p))
 	}
 	n, err := w.tmps[len(w.tmps)-1].Write(p[:maxToWrite])
-	w.tmps[len(w.tmps)-1].h.Write(p[:maxToWrite])
 	w.size += uint64(n)
 	if err != nil {
 		return err
@@ -82,12 +73,12 @@ func (w *Writer) readFromTmp(p []byte, destructive bool) error {
 	if len(p) == 0 {
 		return nil
 	}
-	tmpI := w.tmpReadPos / w.pieceSize
+	tmpI := w.tmpReadPos / w.tmpSize
 	if tmpI > uint64(len(w.tmps)) {
 		return errors.New("all tmp files are consumed")
 	}
-	currentPosInTmp := w.tmpReadPos % w.pieceSize
-	maxToRead := w.pieceSize - currentPosInTmp
+	currentPosInTmp := w.tmpReadPos % w.tmpSize
+	maxToRead := w.tmpSize - currentPosInTmp
 	if maxToRead > uint64(len(p)) {
 		maxToRead = uint64(len(p))
 	}
@@ -96,7 +87,7 @@ func (w *Writer) readFromTmp(p []byte, destructive bool) error {
 		return err
 	}
 	w.tmpReadPos += maxToRead
-	if destructive && w.tmpReadPos%w.pieceSize == 0 {
+	if destructive && w.tmpReadPos%w.tmpSize == 0 {
 		// erase tmp data piece to avoid double disk usage
 		_ = w.tmps[tmpI].Close()
 		_ = w.tmps[tmpI].Drop()
@@ -134,15 +125,6 @@ func (w *Writer) readFromTmpPieceByPiece(destructive bool, fn func([]byte) error
 	return nil
 }
 
-func (w *Writer) Root() hash.Hash {
-	hashes := hash.Hashes{}
-	for _, tmp := range w.tmps {
-		h := hash.BytesToHash(tmp.h.Sum(nil))
-		hashes = append(hashes, h)
-	}
-	return calcHashesRoot(hashes, w.pieceSize, w.size)
-}
-
 func (w *Writer) Flush() (hash.Hash, error) {
 	// write piece
 	_, err := w.backend.Write(bigendian.Uint32ToBytes(uint32(w.pieceSize)))
@@ -156,13 +138,14 @@ func (w *Writer) Flush() (hash.Hash, error) {
 	}
 	// write piece hashes
 	hashes := hash.Hashes{}
-	for _, tmp := range w.tmps {
-		h := hash.BytesToHash(tmp.h.Sum(nil))
+	err = w.readFromTmpPieceByPiece(false, func(piece []byte) error {
+		h := calcHash(piece)
 		hashes = append(hashes, h)
-		_, err = w.backend.Write(h[:])
-		if err != nil {
-			return hash.Hash{}, err
-		}
+		_, err := w.backend.Write(h[:])
+		return err
+	})
+	if err != nil {
+		return hash.Hash{}, err
 	}
 	root := calcHashesRoot(hashes, w.pieceSize, w.size)
 	// write data and drop tmp files
