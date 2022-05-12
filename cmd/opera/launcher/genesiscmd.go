@@ -476,6 +476,7 @@ func mergeGenesis(ctx *cli.Context) error {
 			return err
 		}
 
+		println(dataStartPos, endPos, size)
 		_, err = fh.Seek(dataStartPos-(8+8+32), io.SeekStart)
 		if err != nil {
 			return err
@@ -494,7 +495,8 @@ func mergeGenesis(ctx *cli.Context) error {
 			return err
 		}
 
-		_, err = fh.Seek(0, io.SeekEnd)
+		gg, err := fh.Seek(0, io.SeekEnd)
+		println(gg)
 		if err != nil {
 			return err
 		}
