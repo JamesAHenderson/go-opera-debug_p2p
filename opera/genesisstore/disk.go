@@ -1,7 +1,6 @@
 package genesisstore
 
 import (
-	"archive/zip"
 	"bytes"
 	"errors"
 	"fmt"
@@ -57,107 +56,47 @@ func checkFileHeader(reader io.Reader) error {
 	return nil
 }
 
-func OpenGenesisStoreRaw(rawReader fileszip.Reader) (*zip.File, error) {
-	header := genesis.Header{}
-	hashes := genesis.Hashes{}
-	{
-		reader := io.NewSectionReader(rawReader.Reader, 0, rawReader.Size)
-		err := checkFileHeader(reader)
-		if err != nil {
-			return nil, err
-		}
-		header := genesis.Header{}
-		err = rlp.Decode(dummyByteReader{reader}, &header)
-		if err != nil {
-			return nil, err
-		}
-		_hashes := genesis.Hashes{}
-		err = rlp.Decode(dummyByteReader{reader}, &_hashes)
-		if err != nil {
-			return nil, err
-		}
-		hashes.Add(_hashes)
-		consumed, err := reader.Seek(0, io.SeekCurrent)
-		if err != nil {
-			return nil, err
-		}
-		// move reader past consumed data
-		rawReader.Reader = io.NewSectionReader(rawReader.Reader, consumed, rawReader.Size-consumed)
-	}
-
-	zipMap, err := zip.NewReader()
-	if err != nil {
-		return nil, hashes, err
-	}
-
-	hashesMap := make(map[string]hash.Hash)
-	for i, h := range hashes.Blocks {
-		hashesMap[getSectionName(BlocksSection, i)] = h
-	}
-	for i, h := range hashes.Epochs {
-		hashesMap[getSectionName(EpochsSection, i)] = h
-	}
-	for i, h := range hashes.RawEvmItems {
-		hashesMap[getSectionName(EvmSection, i)] = h
-	}
-	hashedMap := fileshash.Wrap(func(name string) (io.ReadCloser, error) {
-		// wrap with a logger
-		f, size, err := zipMap.Open(name)
-		if err != nil {
-			return nil, err
-		}
-		// human-readable name
-		if name == BlocksSection {
-			name = "blocks"
-		}
-		if name == EpochsSection {
-			name = "epochs"
-		}
-		if name == EvmSection {
-			name = "EVM data"
-		}
-		return filelog.Wrap(f, name, size, time.Minute), nil
-	}, FilesHashMaxMemUsage, hashesMap)
-
-	return NewStore(hashedMap, header, close), hashes, nil
-}
-
-func OpenGenesisStore(rawReaders []fileszip.Reader, close func() error) (*Store, genesis.Hashes, error) {
+func OpenGenesisStoreRaw(rawReaders []fileszip.Reader) (*fileszip.Map, genesis.Header, genesis.Hashes, error) {
 	header := genesis.Header{}
 	hashes := genesis.Hashes{}
 	for i, rawReader := range rawReaders {
 		reader := io.NewSectionReader(rawReader.Reader, 0, rawReader.Size)
 		err := checkFileHeader(reader)
 		if err != nil {
-			return nil, hashes, err
+			return nil, header, hashes, err
 		}
 		_header := genesis.Header{}
 		err = rlp.Decode(dummyByteReader{reader}, &_header)
 		if err != nil {
-			return nil, hashes, err
+			return nil, header, hashes, err
 		}
 		if i == 0 {
 			header = _header
 		} else {
 			if !header.Equal(_header) {
-				return nil, hashes, errors.New("subsequent genesis header doesn't match to the first header")
+				return nil, header, hashes, errors.New("subsequent genesis header doesn't match to the first header")
 			}
 		}
 		_hashes := genesis.Hashes{}
 		err = rlp.Decode(dummyByteReader{reader}, &_hashes)
 		if err != nil {
-			return nil, hashes, err
+			return nil, header, hashes, err
 		}
 		hashes.Add(_hashes)
 		consumed, err := reader.Seek(0, io.SeekCurrent)
 		if err != nil {
-			return nil, hashes, err
+			return nil, header, hashes, err
 		}
 		// move reader past consumed data
 		rawReaders[i].Reader = io.NewSectionReader(rawReader.Reader, consumed, rawReader.Size-consumed)
 	}
 
 	zipMap, err := fileszip.Open(rawReaders)
+	return zipMap, header, hashes, err
+}
+
+func OpenGenesisStore(rawReaders []fileszip.Reader, close func() error) (*Store, genesis.Hashes, error) {
+	zipMap, header, hashes, err := OpenGenesisStoreRaw(rawReaders)
 	if err != nil {
 		return nil, hashes, err
 	}

@@ -168,6 +168,21 @@ func loadAllConfigs(file string, cfg *config) error {
 	return err
 }
 
+func openFileszipReader(path string) (fileszip.Reader, io.Closer) {
+	f, err := os.Open(path)
+	if err != nil {
+		utils.Fatalf("Failed to open genesis file: %v", err)
+	}
+	fi, err := f.Stat()
+	if err != nil {
+		utils.Fatalf("Failed to stat genesis file: %v", err)
+	}
+	return fileszip.Reader{
+		Reader: f,
+		Size:   fi.Size(),
+	}, f
+}
+
 func mayGetGenesisStore(ctx *cli.Context) *genesisstore.Store {
 	switch {
 	case ctx.GlobalIsSet(FakeNetFlag.Name):
@@ -182,19 +197,9 @@ func mayGetGenesisStore(ctx *cli.Context) *genesisstore.Store {
 		var closers []io.Closer
 
 		for _, gPath := range genesisPaths {
-			f, err := os.Open(gPath)
-			if err != nil {
-				utils.Fatalf("Failed to open genesis file: %v", err)
-			}
-			fi, err := f.Stat()
-			if err != nil {
-				utils.Fatalf("Failed to stat genesis file: %v", err)
-			}
-			files = append(files, fileszip.Reader{
-				Reader: f,
-				Size:   fi.Size(),
-			})
-			closers = append(closers, f)
+			f, c := openFileszipReader(gPath)
+			files = append(files, f)
+			closers = append(closers, c)
 		}
 		genesisStore, genesisHashes, err := genesisstore.OpenGenesisStore(files, func() error {
 			for _, cl := range closers {

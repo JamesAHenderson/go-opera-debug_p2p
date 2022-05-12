@@ -92,6 +92,21 @@ last epoch to write.
 EVM export mode is configured with --export.evm.mode.
 `,
 			},
+			{
+				Name:      "gather-genesis",
+				Usage:     "Merge genesis files",
+				ArgsUsage: "<header-source> <epochs-source> <blocks-source> <evm-source> <destination>",
+				Action:    utils.MigrateFlags(mergeGenesis),
+				Flags: []cli.Flag{
+					DataDirFlag,
+				},
+				Description: `
+    opera export gather-genesis
+
+Merge multiple genesis files into a single file.
+Use - for empty genesis file.
+`,
+			},
 		},
 	}
 	checkCommand = cli.Command{

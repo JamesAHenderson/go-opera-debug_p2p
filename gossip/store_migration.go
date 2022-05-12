@@ -83,8 +83,8 @@ func fixEventTxHashes(e *inter.EventPayload) {
 		})
 	}
 	if e.ID() == fixTxEvent2 {
-		tx := e.Txs()[fixTxEventPos1]
-		e.Txs()[fixTxEventPos1] = types.NewTx(&types.LegacyTx{
+		tx := e.Txs()[fixTxEventPos2]
+		e.Txs()[fixTxEventPos2] = types.NewTx(&types.LegacyTx{
 			Nonce:    tx.Nonce(),
 			GasPrice: tx.GasPrice(),
 			Gas:      tx.Gas(),
