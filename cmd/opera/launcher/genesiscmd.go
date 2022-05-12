@@ -1,7 +1,6 @@
 package launcher
 
 import (
-	"archive/zip"
 	"errors"
 	"fmt"
 	"io"
@@ -10,6 +9,8 @@ import (
 	"os"
 	"path"
 	"strconv"
+
+	"github.com/klauspost/compress/zip"
 
 	"github.com/Fantom-foundation/lachesis-base/hash"
 	"github.com/Fantom-foundation/lachesis-base/inter/idx"
@@ -432,15 +433,11 @@ func mergeGenesis(ctx *cli.Context) error {
 			return err
 		}
 		defer reader.Close()
-		//writer, err := z.Create(name)
-		writer, err := z.CreateHeader(&zip.FileHeader{
-			Name:   name,
-			Method: zip.Store,
-		})
+		writer, err := z.Create(name)
 		if err != nil {
 			return err
 		}
-		buf := make([]byte, 64*1024)
+		buf := make([]byte, 32*1024)
 		eof := false
 		for !eof {
 			n, err := reader.Read(buf)
