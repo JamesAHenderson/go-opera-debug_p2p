@@ -408,7 +408,7 @@ func mergeGenesis(ctx *cli.Context) error {
 			return err
 		}
 
-		dataStartPos, err := fh.Seek(8+32, io.SeekCurrent)
+		dataStartPos, err := fh.Seek(8+8+32, io.SeekCurrent)
 		if err != nil {
 			return err
 		}
@@ -471,12 +471,21 @@ func mergeGenesis(ctx *cli.Context) error {
 		close(quit)
 		wg.Wait()
 
-		_, err = fh.Seek(dataStartPos-(8+32), io.SeekStart)
+		endPos, err := fh.Seek(0, io.SeekCurrent)
+		if err != nil {
+			return err
+		}
+
+		_, err = fh.Seek(dataStartPos-(8+8+32), io.SeekStart)
 		if err != nil {
 			return err
 		}
 
 		_, err = fh.Write(h.Bytes())
+		if err != nil {
+			return err
+		}
+		_, err = fh.Write(bigendian.Uint64ToBytes(uint64(endPos - dataStartPos)))
 		if err != nil {
 			return err
 		}
