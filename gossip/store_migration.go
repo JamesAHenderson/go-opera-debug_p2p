@@ -33,6 +33,7 @@ func (s *Store) migrateData() error {
 		return nil
 	}
 
+	_ = s.eraseSfcApiTable()
 	err := s.migrations().Exec(versions, s.flushDBs)
 	return err
 }
