@@ -1,6 +1,7 @@
 package genesisstore
 
 import (
+	"archive/zip"
 	"bytes"
 	"errors"
 	"fmt"
@@ -54,6 +55,71 @@ func checkFileHeader(reader io.Reader) error {
 		return errors.New(fmt.Sprintf("wrong version of genesis file, got=%s, expected=%s", got, expected))
 	}
 	return nil
+}
+
+func OpenGenesisStoreRaw(rawReader fileszip.Reader) (*zip.File, error) {
+	header := genesis.Header{}
+	hashes := genesis.Hashes{}
+	{
+		reader := io.NewSectionReader(rawReader.Reader, 0, rawReader.Size)
+		err := checkFileHeader(reader)
+		if err != nil {
+			return nil, err
+		}
+		header := genesis.Header{}
+		err = rlp.Decode(dummyByteReader{reader}, &header)
+		if err != nil {
+			return nil, err
+		}
+		_hashes := genesis.Hashes{}
+		err = rlp.Decode(dummyByteReader{reader}, &_hashes)
+		if err != nil {
+			return nil, err
+		}
+		hashes.Add(_hashes)
+		consumed, err := reader.Seek(0, io.SeekCurrent)
+		if err != nil {
+			return nil, err
+		}
+		// move reader past consumed data
+		rawReader.Reader = io.NewSectionReader(rawReader.Reader, consumed, rawReader.Size-consumed)
+	}
+
+	zipMap, err := zip.NewReader()
+	if err != nil {
+		return nil, hashes, err
+	}
+
+	hashesMap := make(map[string]hash.Hash)
+	for i, h := range hashes.Blocks {
+		hashesMap[getSectionName(BlocksSection, i)] = h
+	}
+	for i, h := range hashes.Epochs {
+		hashesMap[getSectionName(EpochsSection, i)] = h
+	}
+	for i, h := range hashes.RawEvmItems {
+		hashesMap[getSectionName(EvmSection, i)] = h
+	}
+	hashedMap := fileshash.Wrap(func(name string) (io.ReadCloser, error) {
+		// wrap with a logger
+		f, size, err := zipMap.Open(name)
+		if err != nil {
+			return nil, err
+		}
+		// human-readable name
+		if name == BlocksSection {
+			name = "blocks"
+		}
+		if name == EpochsSection {
+			name = "epochs"
+		}
+		if name == EvmSection {
+			name = "EVM data"
+		}
+		return filelog.Wrap(f, name, size, time.Minute), nil
+	}, FilesHashMaxMemUsage, hashesMap)
+
+	return NewStore(hashedMap, header, close), hashes, nil
 }
 
 func OpenGenesisStore(rawReaders []fileszip.Reader, close func() error) (*Store, genesis.Hashes, error) {

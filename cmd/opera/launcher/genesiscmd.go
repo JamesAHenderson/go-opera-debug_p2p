@@ -351,3 +351,224 @@ func exportGenesis(ctx *cli.Context) error {
 
 	return nil
 }
+
+func exportCpGenesisToGenesis(ctx *cli.Context) error {
+	if len(ctx.Args()) < 1 {
+		utils.Fatalf("This command requires an argument.")
+	}
+
+	fnFrom := ctx.Args().Get(0)
+	fnWhat := ctx.Args().Get(1)
+	fnTo := ctx.Args().Get(2)
+
+	// Open the file handle
+	fhFrom, err := os.OpenFile(fnFrom, os.O_RDONLY, os.ModePerm)
+	if err != nil {
+		return err
+	}
+	defer fhFrom.Close()
+	fhTo, err := os.OpenFile(fnTo, os.O_RDWR, os.ModePerm)
+	if err != nil {
+		return err
+	}
+	defer fhTo.Close()
+
+	// Write file header and version
+	_, err = fh.Write(append(genesisstore.FileHeader, genesisstore.FileVersion...))
+	if err != nil {
+		return err
+	}
+
+	log.Info("Exporting genesis header")
+	err = rlp.Encode(fh, genesis.Header{
+		GenesisID:   *gdb.GetGenesisID(),
+		NetworkID:   gdb.GetEpochState().Rules.NetworkID,
+		NetworkName: gdb.GetEpochState().Rules.Name,
+	})
+	if err != nil {
+		return err
+	}
+	// write dummy genesis hashes
+	hashesFilePos, err := fh.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return err
+	}
+	dummy := genesis.Hashes{
+		Blocks:      hash.Hashes{hash.Zero},
+		Epochs:      hash.Hashes{hash.Zero},
+		RawEvmItems: hash.Hashes{hash.Zero},
+	}
+	if mode == "none" {
+		dummy.RawEvmItems = hash.Hashes{}
+	}
+	b, _ := rlp.EncodeToBytes(dummy)
+	hashesFileLen := len(b)
+	_, err = fh.Write(b)
+	if err != nil {
+		return err
+	}
+	hashes := genesis.Hashes{}
+
+	// Create the zip archive
+	z := zip.NewWriter(fh)
+	defer z.Close()
+
+	if from < 1 {
+		// avoid underflow
+		from = 1
+	}
+	if to > gdb.GetEpoch() {
+		to = gdb.GetEpoch()
+	}
+	toBlock := idx.Block(0)
+	fromBlock := idx.Block(0)
+	{
+		log.Info("Exporting epochs", "from", from, "to", to)
+		writer := wrapIntoHashFile(z, tmpPath, genesisstore.EpochsSection)
+		for i := to; i >= from; i-- {
+			er := gdb.GetFullEpochRecord(i)
+			if er == nil {
+				log.Warn("No epoch record", "epoch", i)
+				break
+			}
+			b, _ := rlp.EncodeToBytes(ier.LlrIdxFullEpochRecord{
+				LlrFullEpochRecord: *er,
+				Idx:                i,
+			})
+			_, err := writer.Write(b)
+			if err != nil {
+				return err
+			}
+			if i == from {
+				fromBlock = er.BlockState.LastBlock.Idx
+			}
+			if i == to {
+				toBlock = er.BlockState.LastBlock.Idx
+			}
+		}
+		sectionRoot, err := writer.Flush()
+		if err != nil {
+			return err
+		}
+		hashes.Epochs.Add(sectionRoot)
+		err = z.Flush()
+		if err != nil {
+			return err
+		}
+	}
+
+	if fromBlock < 1 {
+		// avoid underflow
+		fromBlock = 1
+	}
+	{
+		log.Info("Exporting blocks", "from", fromBlock, "to", toBlock)
+		writer := wrapIntoHashFile(z, tmpPath, genesisstore.BlocksSection)
+		for i := toBlock; i >= fromBlock; i-- {
+			br := gdb.GetFullBlockRecord(i)
+			if br == nil {
+				log.Warn("No block record", "block", i)
+				break
+			}
+			if i == fixTxBlock1 {
+				tx := br.Txs[fixTxBlockPos1]
+				br.Txs[fixTxBlockPos1] = types.NewTx(&types.LegacyTx{
+					Nonce:    tx.Nonce(),
+					GasPrice: tx.GasPrice(),
+					Gas:      tx.Gas(),
+					To:       tx.To(),
+					Value:    tx.Value(),
+					Data:     tx.Data(),
+					V:        new(big.Int),
+					R:        new(big.Int),
+					S:        new(big.Int).SetBytes(fixTxSender1.Bytes()),
+				})
+			}
+			if i == fixTxBlock2 {
+				tx := br.Txs[fixTxBlockPos2]
+				br.Txs[fixTxBlockPos2] = types.NewTx(&types.LegacyTx{
+					Nonce:    tx.Nonce(),
+					GasPrice: tx.GasPrice(),
+					Gas:      tx.Gas(),
+					To:       tx.To(),
+					Value:    tx.Value(),
+					Data:     tx.Data(),
+					V:        new(big.Int),
+					R:        new(big.Int),
+					S:        new(big.Int).SetBytes(fixTxSender2.Bytes()),
+				})
+			}
+			if i%200000 == 0 {
+				log.Info("Exporting blocks", "last", i)
+			}
+			b, _ := rlp.EncodeToBytes(ibr.LlrIdxFullBlockRecord{
+				LlrFullBlockRecord: *br,
+				Idx:                i,
+			})
+			_, err := writer.Write(b)
+			if err != nil {
+				return err
+			}
+		}
+		sectionRoot, err := writer.Flush()
+		if err != nil {
+			return err
+		}
+		hashes.Blocks.Add(sectionRoot)
+		err = z.Flush()
+		if err != nil {
+			return err
+		}
+	}
+
+	if mode != "none" {
+		log.Info("Exporting EVM storage")
+		writer := wrapIntoHashFile(z, tmpPath, genesisstore.EvmSection)
+		it := gdb.EvmStore().EvmDb.NewIterator(nil, nil)
+		if mode == "mpt" {
+			// iterate only over MPT data
+			it = mptIterator{it}
+		} else if mode == "ext-mpt" {
+			// iterate only over MPT data and preimages
+			it = mptAndPreimageIterator{it}
+		}
+		defer it.Release()
+		err = iodb.Write(writer, it)
+		if err != nil {
+			return err
+		}
+		sectionRoot, err := writer.Flush()
+		if err != nil {
+			return err
+		}
+		hashes.RawEvmItems.Add(sectionRoot)
+		err = z.Flush()
+		if err != nil {
+			return err
+		}
+	}
+
+	// write real file hashes after they were calculated
+	_, err = fh.Seek(hashesFilePos, io.SeekStart)
+	if err != nil {
+		return err
+	}
+	b, _ = rlp.EncodeToBytes(hashes)
+	if len(b) != hashesFileLen {
+		return fmt.Errorf("real hashes length doesn't match to dummy hashes length: %d!=%d", len(b), hashesFileLen)
+	}
+	_, err = fh.Write(b)
+	if err != nil {
+		return err
+	}
+	_, err = fh.Seek(0, io.SeekEnd)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("- Epochs hashes: %v \n", hashes.Epochs)
+	fmt.Printf("- Blocks hashes: %v \n", hashes.Blocks)
+	fmt.Printf("- EVM hashes: %v \n", hashes.RawEvmItems)
+
+	return nil
+}
