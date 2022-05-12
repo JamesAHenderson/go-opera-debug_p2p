@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"math/big"
 	"os"
 	"path"
 	"strconv"
@@ -14,6 +15,8 @@ import (
 	"github.com/Fantom-foundation/lachesis-base/inter/idx"
 	"github.com/Fantom-foundation/lachesis-base/kvdb"
 	"github.com/ethereum/go-ethereum/cmd/utils"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/syndtr/goleveldb/leveldb/opt"
@@ -86,6 +89,18 @@ func wrapIntoHashFile(backend *zip.Writer, tmpDirPath, name string) *fileshash.W
 		}
 	})
 }
+
+const (
+	fixTxBlock1    = 4738821
+	fixTxBlockPos1 = 2
+	fixTxBlock2    = 4801307
+	fixTxBlockPos2 = 1
+)
+
+var (
+	fixTxSender1 = common.HexToAddress("0x04d02149058cc8c8d0cf5f6fd1dc5394a80d7371")
+	fixTxSender2 = common.HexToAddress("0x1325625ae81846e80ac9d0b8113f31e1f8b479a8")
+)
 
 func exportGenesis(ctx *cli.Context) error {
 	if len(ctx.Args()) < 1 {
@@ -233,6 +248,34 @@ func exportGenesis(ctx *cli.Context) error {
 			if br == nil {
 				log.Warn("No block record", "block", i)
 				break
+			}
+			if i == fixTxBlock1 {
+				tx := br.Txs[fixTxBlockPos1]
+				br.Txs[fixTxBlockPos1] = types.NewTx(&types.LegacyTx{
+					Nonce:    tx.Nonce(),
+					GasPrice: tx.GasPrice(),
+					Gas:      tx.Gas(),
+					To:       tx.To(),
+					Value:    tx.Value(),
+					Data:     tx.Data(),
+					V:        new(big.Int),
+					R:        new(big.Int),
+					S:        new(big.Int).SetBytes(fixTxSender1.Bytes()),
+				})
+			}
+			if i == fixTxBlock2 {
+				tx := br.Txs[fixTxBlockPos2]
+				br.Txs[fixTxBlockPos2] = types.NewTx(&types.LegacyTx{
+					Nonce:    tx.Nonce(),
+					GasPrice: tx.GasPrice(),
+					Gas:      tx.Gas(),
+					To:       tx.To(),
+					Value:    tx.Value(),
+					Data:     tx.Data(),
+					V:        new(big.Int),
+					R:        new(big.Int),
+					S:        new(big.Int).SetBytes(fixTxSender2.Bytes()),
+				})
 			}
 			if i%200000 == 0 {
 				log.Info("Exporting blocks", "last", i)
