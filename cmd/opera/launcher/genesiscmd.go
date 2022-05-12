@@ -10,8 +10,11 @@ import (
 	"path"
 	"strconv"
 	"sync"
+	"time"
 
+	"github.com/Fantom-foundation/lachesis-base/common/bigendian"
 	"github.com/klauspost/compress/zip"
+	gzip "github.com/klauspost/pgzip"
 
 	"github.com/Fantom-foundation/lachesis-base/hash"
 	"github.com/Fantom-foundation/lachesis-base/inter/idx"
@@ -32,6 +35,7 @@ import (
 	"github.com/Fantom-foundation/go-opera/opera/genesisstore"
 	"github.com/Fantom-foundation/go-opera/opera/genesisstore/fileshash"
 	"github.com/Fantom-foundation/go-opera/opera/genesisstore/fileszip"
+	utils2 "github.com/Fantom-foundation/go-opera/utils"
 	"github.com/Fantom-foundation/go-opera/utils/iodb"
 )
 
@@ -356,12 +360,14 @@ func exportGenesis(ctx *cli.Context) error {
 }
 
 func openGenesisStoreRaw(path string) (*fileszip.Map, genesis.Header, genesis.Hashes, func() error, error) {
-	if path == "-" {
-		return nil, genesis.Header{}, genesis.Hashes{}, func() error { return nil }, nil
-	}
 	headFh, c := openFileszipReader(path)
 	zMap, header, hashes, err := genesisstore.OpenGenesisStoreRaw([]fileszip.Reader{headFh})
 	return zMap, header, hashes, c.Close, err
+}
+
+type GenesisUnitHeader struct {
+	UnitName string
+	Network  genesis.Header
 }
 
 func mergeGenesis(ctx *cli.Context) error {
@@ -369,29 +375,13 @@ func mergeGenesis(ctx *cli.Context) error {
 		utils.Fatalf("This command requires 5 arguments.")
 	}
 
+	start := time.Now()
+
 	_, header, _, hCloser, err := openGenesisStoreRaw(ctx.Args().Get(0))
 	if err != nil {
 		return err
 	}
-	defer hCloser()
-
-	evsZip, _, evsHash, evsCloser, err := openGenesisStoreRaw(ctx.Args().Get(1))
-	if err != nil {
-		return err
-	}
-	defer evsCloser()
-
-	bvsZip, _, bvsHash, bvsCloser, err := openGenesisStoreRaw(ctx.Args().Get(2))
-	if err != nil {
-		return err
-	}
-	defer bvsCloser()
-
-	evmZip, _, evmHash, evmCloser, err := openGenesisStoreRaw(ctx.Args().Get(3))
-	if err != nil {
-		return err
-	}
-	defer evmCloser()
+	hCloser()
 
 	fn := ctx.Args().Get(4)
 
@@ -402,43 +392,35 @@ func mergeGenesis(ctx *cli.Context) error {
 	}
 	defer fh.Close()
 
-	// Write file header and version
-	_, err = fh.Write(append(genesisstore.FileHeader, genesisstore.FileVersion...))
-	if err != nil {
-		return err
-	}
+	writeSection := func(readerZip *fileszip.Map, name string, h hash.Hash) error {
+		// Write unit marker and version
+		_, err = fh.Write(append(genesisstore.FileHeader, genesisstore.FileVersion...))
+		if err != nil {
+			return err
+		}
 
-	log.Info("Exporting genesis header")
-	err = rlp.Encode(fh, header)
-	if err != nil {
-		return err
-	}
-	// write genesis hashes
-	hashes := genesis.Hashes{
-		Blocks:      evsHash.Blocks,
-		Epochs:      bvsHash.Epochs,
-		RawEvmItems: evmHash.RawEvmItems,
-	}
-	err = rlp.Encode(fh, hashes)
-	if err != nil {
-		return err
-	}
+		// write genesis hashes
+		err = rlp.Encode(fh, GenesisUnitHeader{
+			UnitName: name,
+			Network:  header,
+		})
+		if err != nil {
+			return err
+		}
 
-	// Create the zip archive
-	z := zip.NewWriter(fh)
-	defer z.Close()
+		dataStartPos, err := fh.Seek(8+32, io.SeekCurrent)
+		if err != nil {
+			return err
+		}
 
-	writeSection := func(readerZip *fileszip.Map, name string) error {
 		reader, _, err := readerZip.Open(name)
 		if err != nil {
 			return err
 		}
 		defer reader.Close()
-		writer, err := z.Create(name)
-		if err != nil {
-			return err
-		}
+		writer := gzip.NewWriter(fh)
 
+		size := uint64(0)
 		buffersToRead := make(chan []byte, 10)
 		buffersToRead <- make([]byte, 32*1024)
 		buffersToRead <- make([]byte, 32*1024)
@@ -463,6 +445,10 @@ func mergeGenesis(ctx *cli.Context) error {
 					}
 					buffersToRead <- buf.b
 				case <-quit:
+					err = writer.Flush()
+					if err != nil {
+						panic(err)
+					}
 					return
 				}
 			}
@@ -480,36 +466,73 @@ func mergeGenesis(ctx *cli.Context) error {
 				b []byte
 				s int
 			}{buf, n}
+			size += uint64(n)
 		}
 		close(quit)
 		wg.Wait()
-		err = z.Flush()
+
+		_, err = fh.Seek(dataStartPos-(8+32), io.SeekStart)
 		if err != nil {
 			return err
 		}
+
+		_, err = fh.Write(h.Bytes())
+		if err != nil {
+			return err
+		}
+		_, err = fh.Write(bigendian.Uint64ToBytes(size))
+		if err != nil {
+			return err
+		}
+
+		_, err = fh.Seek(0, io.SeekEnd)
+		if err != nil {
+			return err
+		}
+
 		return nil
 	}
 
-	log.Info("Writing epochs")
-	err = writeSection(evsZip, genesisstore.EpochsSection)
+	log.Info("Writing epochs", "elapsed", utils2.PrettyDuration(time.Since(start)))
+	if ctx.Args().Get(1) != "-" {
+		evsZip, _, evsHash, evsCloser, err := openGenesisStoreRaw(ctx.Args().Get(1))
+		if err != nil {
+			return err
+		}
+		err = writeSection(evsZip, genesisstore.EpochsSection, evsHash.Epochs[0])
+		if err != nil {
+			return err
+		}
+		fmt.Printf("- Epochs hashes: %v \n", evsHash.Epochs)
+		evsCloser()
+	}
+	log.Info("Writing blocks", "elapsed", utils2.PrettyDuration(time.Since(start)))
+	if ctx.Args().Get(2) != "-" {
+		bvsZip, _, bvsHash, bvsCloser, err := openGenesisStoreRaw(ctx.Args().Get(2))
+		if err != nil {
+			return err
+		}
+		err = writeSection(bvsZip, genesisstore.BlocksSection, bvsHash.Blocks[0])
+		if err != nil {
+			return err
+		}
+		fmt.Printf("- Blocks hashes: %v \n", bvsHash.Blocks)
+		bvsCloser()
+	}
+	if ctx.Args().Get(3) != "-" {
+		log.Info("Writing EVM", "elapsed", utils2.PrettyDuration(time.Since(start)))
+		evmZip, _, evmHash, evmCloser, err := openGenesisStoreRaw(ctx.Args().Get(3))
+		if err != nil {
+			return err
+		}
+		err = writeSection(evmZip, genesisstore.EvmSection, evmHash.RawEvmItems[0])
+		fmt.Printf("- EVM hashes: %v \n", evmHash.RawEvmItems)
+		evmCloser()
+	}
 	if err != nil {
 		return err
 	}
-	log.Info("Writing blocks")
-	err = writeSection(bvsZip, genesisstore.BlocksSection)
-	if err != nil {
-		return err
-	}
-	log.Info("Writing EVM")
-	err = writeSection(evmZip, genesisstore.EvmSection)
-	if err != nil {
-		return err
-	}
-	log.Info("Genesis is generated")
-
-	fmt.Printf("- Epochs hashes: %v \n", hashes.Epochs)
-	fmt.Printf("- Blocks hashes: %v \n", hashes.Blocks)
-	fmt.Printf("- EVM hashes: %v \n", hashes.RawEvmItems)
+	log.Info("Genesis is merged", "elapsed", utils2.PrettyDuration(time.Since(start)))
 
 	return nil
 }
