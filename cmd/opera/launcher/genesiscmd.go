@@ -432,7 +432,11 @@ func mergeGenesis(ctx *cli.Context) error {
 			return err
 		}
 		defer reader.Close()
-		writer, err := z.Create(name)
+		//writer, err := z.Create(name)
+		writer, err := z.CreateHeader(&zip.FileHeader{
+			Name:   name,
+			Method: zip.Store,
+		})
 		if err != nil {
 			return err
 		}
@@ -472,6 +476,7 @@ func mergeGenesis(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
+	log.Info("Genesis is generated")
 
 	fmt.Printf("- Epochs hashes: %v \n", hashes.Epochs)
 	fmt.Printf("- Blocks hashes: %v \n", hashes.Blocks)
