@@ -423,7 +423,7 @@ func mergeGenesis(ctx *cli.Context) error {
 			return err
 		}
 
-		// write genesis hashes
+		// write genesis header
 		err = rlp.Encode(fh, GenesisUnitHeader{
 			UnitName: name,
 			Network:  header,
@@ -437,13 +437,13 @@ func mergeGenesis(ctx *cli.Context) error {
 			return err
 		}
 
-		reader, _, err := readerZip.Open(name)
+		zReader, _, err := readerZip.Open(name)
 		if err != nil {
 			return err
 		}
-		defer reader.Close()
+		defer zReader.Close()
 
-		reader = fileshash_unfixed.WrapReader(reader, opt.GiB, h)
+		reader := fileshash_unfixed.WrapReader(zReader, opt.GiB, h)
 
 		gWriter := gzip.NewWriter(fh)
 
