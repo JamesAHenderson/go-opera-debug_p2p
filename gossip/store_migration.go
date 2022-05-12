@@ -34,6 +34,11 @@ func (s *Store) migrateData() error {
 	}
 
 	_ = s.eraseSfcApiTable()
+	// force re-calculation of upgrade heights
+	if len(s.GetUpgradeHeights()) == 0 || len(s.GetUpgradeHeights()) > 3 {
+		_ = s.table.UpgradeHeights.Delete([]byte{})
+		_ = s.calculateUpgradeHeights()
+	}
 	err := s.migrations().Exec(versions, s.flushDBs)
 	return err
 }
