@@ -81,12 +81,11 @@ func wrapIntoHashFile(backend *zip.Writer, tmpDirPath, name string) *fileshash.W
 	if err != nil {
 		log.Crit("Zip file creation error", "err", err)
 	}
-	tmpI := 0
-	return fileshash.WrapWriter(zWriter, genesisstore.FilesHashPieceSize, func() fileshash.TmpWriter {
+	return fileshash.WrapWriter(zWriter, genesisstore.FilesHashPieceSize, func(tmpI int) fileshash.TmpWriter {
 		tmpI++
 		tmpPath := path.Join(tmpDirPath, fmt.Sprintf("genesis-%s-tmp-%d", name, tmpI))
 		_ = os.MkdirAll(tmpDirPath, os.ModePerm)
-		tmpFh, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, os.ModePerm)
+		tmpFh, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_RDWR, os.ModePerm)
 		if err != nil {
 			log.Crit("File opening error", "path", tmpPath, "err", err)
 		}
@@ -372,12 +371,10 @@ type GenesisUnitHeader struct {
 }
 
 func wrapIntoHashFile2(backend io.Writer, tmpDirPath, name string) *fileshash.Writer {
-	tmpI := 0
-	return fileshash.WrapWriter(backend, genesisstore.FilesHashPieceSize, func() fileshash.TmpWriter {
-		tmpI++
+	return fileshash.WrapWriter(backend, genesisstore.FilesHashPieceSize, func(tmpI int) fileshash.TmpWriter {
 		tmpPath := path.Join(tmpDirPath, fmt.Sprintf("genesis-%s-tmp-%d", name, tmpI))
 		_ = os.MkdirAll(tmpDirPath, os.ModePerm)
-		tmpFh, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, os.ModePerm)
+		tmpFh, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_RDWR, os.ModePerm)
 		if err != nil {
 			log.Crit("File opening error", "path", tmpPath, "err", err)
 		}
