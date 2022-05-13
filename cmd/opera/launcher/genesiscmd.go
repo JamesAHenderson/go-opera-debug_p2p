@@ -1,6 +1,7 @@
 package launcher
 
 import (
+	"archive/zip"
 	"errors"
 	"fmt"
 	"io"
@@ -13,7 +14,6 @@ import (
 	"time"
 
 	"github.com/Fantom-foundation/lachesis-base/common/bigendian"
-	"github.com/klauspost/compress/zip"
 	gzip "github.com/klauspost/pgzip"
 	"github.com/syndtr/goleveldb/leveldb/opt"
 
@@ -416,7 +416,7 @@ func mergeGenesis(ctx *cli.Context) error {
 	_ = os.RemoveAll(tmpPath)
 	defer os.RemoveAll(tmpPath)
 
-	writeSection := func(readerZip *fileszip.Map, name string, h hash.Hash) error {
+	writeSection := func(readerZip *fileszip.Map, name string, h hash.Hash, level int) error {
 		// Write unit marker and version
 		_, err = fh.Write(append(genesisstore.FileHeader, genesisstore.FileVersion...))
 		if err != nil {
@@ -445,7 +445,7 @@ func mergeGenesis(ctx *cli.Context) error {
 
 		reader := fileshash_unfixed.WrapReader(zReader, opt.GiB, h)
 
-		gWriter := gzip.NewWriter(fh)
+		gWriter, _ := gzip.NewWriterLevel(fh, level)
 
 		writer := wrapIntoHashFile2(gWriter, tmpPath, name)
 
@@ -475,6 +475,9 @@ func mergeGenesis(ctx *cli.Context) error {
 					}
 					buffersToRead <- buf.b
 				case <-quit:
+					if len(buffersForWrite) != 0 {
+						continue
+					}
 					newH, err = writer.Flush()
 					if err != nil {
 						panic(err)
@@ -510,7 +513,7 @@ func mergeGenesis(ctx *cli.Context) error {
 			return err
 		}
 
-		println(newH.String(), dataStartPos, endPos, size)
+		println(newH.String(), dataStartPos, endPos, endPos-dataStartPos, size)
 		_, err = fh.Seek(dataStartPos-(8+8+32), io.SeekStart)
 		if err != nil {
 			return err
@@ -544,7 +547,7 @@ func mergeGenesis(ctx *cli.Context) error {
 		if err != nil {
 			return err
 		}
-		err = writeSection(evsZip, genesisstore.EpochsSection, evsHash.Epochs[0])
+		err = writeSection(evsZip, genesisstore.EpochsSection, evsHash.Epochs[0], gzip.DefaultCompression)
 		if err != nil {
 			return err
 		}
@@ -557,7 +560,7 @@ func mergeGenesis(ctx *cli.Context) error {
 		if err != nil {
 			return err
 		}
-		err = writeSection(bvsZip, genesisstore.BlocksSection, bvsHash.Blocks[0])
+		err = writeSection(bvsZip, genesisstore.BlocksSection, bvsHash.Blocks[0], gzip.DefaultCompression)
 		if err != nil {
 			return err
 		}
@@ -570,7 +573,7 @@ func mergeGenesis(ctx *cli.Context) error {
 		if err != nil {
 			return err
 		}
-		err = writeSection(evmZip, genesisstore.EvmSection, evmHash.RawEvmItems[0])
+		err = writeSection(evmZip, genesisstore.EvmSection, evmHash.RawEvmItems[0], gzip.NoCompression)
 		fmt.Printf("- EVM hashes: %v \n", evmHash.RawEvmItems)
 		evmCloser()
 	}

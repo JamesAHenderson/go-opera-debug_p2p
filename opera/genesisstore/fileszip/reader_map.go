@@ -1,7 +1,7 @@
 package fileszip
 
 import (
-	"github.com/klauspost/compress/zip"
+	"archive/zip"
 	"errors"
 	"io"
 )
