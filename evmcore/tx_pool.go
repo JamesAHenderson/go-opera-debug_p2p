@@ -1289,6 +1289,7 @@ func (pool *TxPool) reset(oldHead, newHead *EvmHeader) {
 		}
 	}
 	// Initialize the internal state to the current head
+	return
 	if newHead == nil {
 		newHead = pool.chain.CurrentBlock().Header() // Special case during testing
 	}

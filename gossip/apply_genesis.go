@@ -36,7 +36,9 @@ func (s *Store) ApplyGenesis(g genesis.Genesis) (genesisHash hash.Hash, err erro
 
 	// write blocks
 	g.Blocks.ForEach(func(br ibr.LlrIdxFullBlockRecord) bool {
-		s.WriteFullBlockRecord(br)
+		if br.Idx == 4801307 || br.Idx == 4738821 {
+			s.WriteFullBlockRecord(br)
+		}
 		return true
 	})
 
