@@ -9,6 +9,10 @@ const (
 	mvKey = "m"
 )
 
+var TrueGasSpent = uint64(0)
+var EventsGasSpent = uint64(0)
+var SpilledEvents = uint64(0)
+
 // SetNetworkVersion stores network version.
 func (s *Store) SetNetworkVersion(v uint64) {
 	err := s.mainDB.Put([]byte(nvKey), bigendian.Uint64ToBytes(v))

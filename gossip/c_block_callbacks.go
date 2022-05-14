@@ -301,7 +301,16 @@ func consensusCallbackBeginBlockFn(
 						block.Txs = append(block.Txs, tx.Hash())
 					}
 
+					all := uint64(0)
+					for _, e := range block.Events {
+						all += store.GetEvent(e).GasPowerUsed()
+					}
 					block, blockEvents := spillBlockEvents(store, block, es.Rules)
+					left := uint64(0)
+					for _, e := range block.Events {
+						left += store.GetEvent(e).GasPowerUsed()
+					}
+					verwatcher.SpilledEvents += all - left
 					txs := make(types.Transactions, 0, blockEvents.Len()*10)
 					for _, e := range blockEvents {
 						txs = append(txs, e.Txs()...)

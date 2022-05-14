@@ -42,6 +42,38 @@ func New(reader Reader) *Checker {
 	}
 }
 
+func CalcGasPowerUsed2(e inter.EventI, rules opera.Rules) uint64 {
+	txsGas := uint64(0)
+
+	gasCfg := rules.Economy.Gas
+
+	parentsGas := uint64(0)
+	if idx.Event(len(e.Parents())) > rules.Dag.MaxFreeParents {
+		parentsGas = uint64(idx.Event(len(e.Parents()))-rules.Dag.MaxFreeParents) * gasCfg.ParentGas
+	}
+	extraGas := uint64(len(e.Extra())) * gasCfg.ExtraDataGas
+
+	return txsGas + parentsGas + extraGas + gasCfg.EventGas
+}
+
+func CalcGasPowerUsed3(e inter.EventPayloadI, rules opera.Rules) uint64 {
+	gasCfg := rules.Economy.Gas
+
+	mpsGas := uint64(len(e.MisbehaviourProofs())) * gasCfg.MisbehaviourProofGas
+
+	bvsGas := uint64(0)
+	if e.BlockVotes().Start != 0 {
+		bvsGas = gasCfg.BlockVotesBaseGas + uint64(len(e.BlockVotes().Votes))*gasCfg.BlockVoteGas
+	}
+
+	ersGas := uint64(0)
+	if e.EpochVote().Epoch != 0 {
+		ersGas = gasCfg.EpochVoteGas
+	}
+
+	return mpsGas + bvsGas + ersGas
+}
+
 func CalcGasPowerUsed(e inter.EventPayloadI, rules opera.Rules) uint64 {
 	txsGas := uint64(0)
 	for _, tx := range e.Txs() {

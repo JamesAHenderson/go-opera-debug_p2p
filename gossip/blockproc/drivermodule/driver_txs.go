@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/Fantom-foundation/go-opera/gossip/blockproc"
+	"github.com/Fantom-foundation/go-opera/gossip/blockproc/verwatcher"
 	"github.com/Fantom-foundation/go-opera/inter"
 	"github.com/Fantom-foundation/go-opera/inter/drivertype"
 	"github.com/Fantom-foundation/go-opera/inter/iblockproc"
@@ -79,6 +80,13 @@ func maxBlockIdx(a, b idx.Block) idx.Block {
 	return b
 }
 
+var trueGasSpentAll = uint64(0)
+var adjGasSpentAll = uint64(0)
+var eventGasSpentAll = uint64(0)
+var spilledEventGasAll = uint64(0)
+
+var iii = uint64(0)
+
 func (p *DriverTxPreTransactor) PopInternalTxs(block iblockproc.BlockCtx, bs iblockproc.BlockState, es iblockproc.EpochState, sealing bool, statedb *state.StateDB) types.Transactions {
 	buildTx := InternalTxBuilder(statedb)
 	internalTxs := make(types.Transactions, 0, 8)
@@ -111,7 +119,20 @@ func (p *DriverTxPreTransactor) PopInternalTxs(block iblockproc.BlockCtx, bs ibl
 				OriginatedTxFee: info.Originated,
 			}
 		}
+		adjGasSpent := bs.EpochGas
+		for _, v := range bs.ValidatorStates {
+			adjGasSpent -= v.DirtyGasRefund
+		}
+		adjGasSpentAll += adjGasSpent
+		trueGasSpentAll += verwatcher.TrueGasSpent
+		eventGasSpentAll += verwatcher.EventsGasSpent
+		spilledEventGasAll += verwatcher.SpilledEvents
+		iii++
+		println("^_^", adjGasSpentAll / iii, trueGasSpentAll / iii, eventGasSpentAll / iii, spilledEventGasAll / iii, "|", adjGasSpent, verwatcher.TrueGasSpent, verwatcher.EventsGasSpent, verwatcher.SpilledEvents)
 		calldata := drivercall.SealEpoch(metrics)
+		verwatcher.TrueGasSpent = 0
+		verwatcher.EventsGasSpent = 0
+		verwatcher.SpilledEvents = 0
 		internalTxs = append(internalTxs, buildTx(calldata, driver.ContractAddress))
 	}
 	return internalTxs
@@ -144,6 +165,7 @@ func (p *DriverTxListener) OnNewReceipt(tx *types.Transaction, r *types.Receipt,
 	if notUsedGas != 0 {
 		p.bs.ValidatorStates[originatorIdx].DirtyGasRefund += notUsedGas
 	}
+	verwatcher.TrueGasSpent += r.GasUsed
 }
 
 func decodeDataBytes(l *types.Log) ([]byte, error) {

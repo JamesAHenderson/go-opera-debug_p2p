@@ -1,7 +1,9 @@
 package eventmodule
 
 import (
+	"github.com/Fantom-foundation/go-opera/eventcheck/epochcheck"
 	"github.com/Fantom-foundation/go-opera/gossip/blockproc"
+	"github.com/Fantom-foundation/go-opera/gossip/blockproc/verwatcher"
 	"github.com/Fantom-foundation/go-opera/inter"
 	"github.com/Fantom-foundation/go-opera/inter/iblockproc"
 )
@@ -33,6 +35,7 @@ func (p *ValidatorEventsProcessor) ProcessConfirmedEvent(e inter.EventI) {
 		p.validatorHighestEvents[creatorIdx] = e
 	}
 	p.bs.EpochGas += e.GasPowerUsed()
+	verwatcher.EventsGasSpent += epochcheck.CalcGasPowerUsed2(e, p.es.Rules)
 }
 
 func (p *ValidatorEventsProcessor) Finalize(block iblockproc.BlockCtx, _ bool) iblockproc.BlockState {
