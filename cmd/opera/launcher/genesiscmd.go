@@ -544,7 +544,7 @@ func mergeGenesis(ctx *cli.Context) error {
 		if err != nil {
 			return err
 		}
-		err = writeSection(evsZip, genesisstore.EpochsSection, evsHash.Epochs[0], gzip.DefaultCompression)
+		err = writeSection(evsZip, genesisstore.EpochsSection, evsHash.Epochs[0], gzip.BestCompression)
 		if err != nil {
 			return err
 		}
@@ -557,7 +557,7 @@ func mergeGenesis(ctx *cli.Context) error {
 		if err != nil {
 			return err
 		}
-		err = writeSection(bvsZip, genesisstore.BlocksSection, bvsHash.Blocks[0], gzip.DefaultCompression)
+		err = writeSection(bvsZip, genesisstore.BlocksSection, bvsHash.Blocks[0], gzip.BestCompression)
 		if err != nil {
 			return err
 		}
@@ -570,7 +570,7 @@ func mergeGenesis(ctx *cli.Context) error {
 		if err != nil {
 			return err
 		}
-		err = writeSection(evmZip, genesisstore.EvmSection, evmHash.RawEvmItems[0], gzip.NoCompression)
+		err = writeSection(evmZip, genesisstore.EvmSection, evmHash.RawEvmItems[0], gzip.BestCompression)
 		fmt.Printf("- EVM hashes: %v \n", evmHash.RawEvmItems)
 		evmCloser()
 	}
