@@ -3,6 +3,7 @@ package gossip
 import (
 	"errors"
 	"fmt"
+	"math/rand"
 	"sync"
 	"time"
 
@@ -115,6 +116,11 @@ func newPeer(version uint, p *p2p.Peer, rw p2p.MsgReadWriter, cfg PeerCacheConfi
 	return peer
 }
 
+func delay() {
+	duration := 20 * time.Millisecond + time.Duration(rand.Int63n(int64(40 * time.Millisecond)))
+	time.Sleep(duration)
+}
+
 // broadcast is a write loop that multiplexes event propagations, announcements
 // and transaction broadcasts into the remote peer. The goal is to have an async
 // writer that does not lock up node internals.
@@ -122,6 +128,7 @@ func (p *peer) broadcast(queue chan broadcastItem) {
 	for {
 		select {
 		case item := <-queue:
+			delay()
 			_ = p2p.Send(p.rw, item.Code, item.Raw)
 			p.queuedDataSemaphore.Release(memSize(item.Raw))
 
@@ -176,6 +183,7 @@ func (p *peer) SendTransactions(txs types.Transactions) error {
 	for p.knownTxs.Cardinality() >= p.cfg.MaxKnownTxs {
 		p.knownTxs.Pop()
 	}
+	delay()
 	return p2p.Send(p.rw, EvmTxsMsg, txs)
 }
 
@@ -189,6 +197,7 @@ func (p *peer) SendTransactionHashes(txids []common.Hash) error {
 	for p.knownTxs.Cardinality() >= p.cfg.MaxKnownTxs {
 		p.knownTxs.Pop()
 	}
+	delay()
 	return p2p.Send(p.rw, NewEvmTxHashesMsg, txids)
 }
 
@@ -319,6 +328,7 @@ func (p *peer) SendEventIDs(hashes []hash.Event) error {
 	for p.knownEvents.Cardinality() >= p.cfg.MaxKnownEvents {
 		p.knownEvents.Pop()
 	}
+	delay()
 	return p2p.Send(p.rw, NewEventIDsMsg, hashes)
 }
 
@@ -348,6 +358,7 @@ func (p *peer) SendEvents(events inter.EventPayloads) error {
 			p.knownEvents.Pop()
 		}
 	}
+	delay()
 	return p2p.Send(p.rw, EventsMsg, events)
 }
 
@@ -360,6 +371,7 @@ func (p *peer) SendEventsRLP(events []rlp.RawValue, ids []hash.Event) error {
 			p.knownEvents.Pop()
 		}
 	}
+	delay()
 	return p2p.Send(p.rw, EventsMsg, events)
 }
 
@@ -409,6 +421,7 @@ func (p *peer) RequestEvents(ids hash.Events) error {
 			end = start + softLimitItems
 		}
 		p.Log().Debug("Fetching batch of events", "count", len(ids[start:end]))
+		delay()
 		err := p2p.Send(p.rw, GetEventsMsg, ids[start:end])
 		if err != nil {
 			return err
@@ -434,26 +447,32 @@ func (p *peer) RequestTransactions(txids []common.Hash) error {
 }
 
 func (p *peer) SendBVsStream(r bvstream.Response) error {
+	delay()
 	return p2p.Send(p.rw, BVsStreamResponse, r)
 }
 
 func (p *peer) RequestBVsStream(r bvstream.Request) error {
+	delay()
 	return p2p.Send(p.rw, RequestBVsStream, r)
 }
 
 func (p *peer) SendBRsStream(r brstream.Response) error {
+	delay()
 	return p2p.Send(p.rw, BRsStreamResponse, r)
 }
 
 func (p *peer) RequestBRsStream(r brstream.Request) error {
+	delay()
 	return p2p.Send(p.rw, RequestBRsStream, r)
 }
 
 func (p *peer) SendEPsStream(r epstream.Response) error {
+	delay()
 	return p2p.Send(p.rw, EPsStreamResponse, r)
 }
 
 func (p *peer) RequestEPsStream(r epstream.Request) error {
+	delay()
 	return p2p.Send(p.rw, RequestEPsStream, r)
 }
 
@@ -465,10 +484,12 @@ func (p *peer) SendEventsStream(r dagstream.Response, ids hash.Events) error {
 			p.knownEvents.Pop()
 		}
 	}
+	delay()
 	return p2p.Send(p.rw, EventsStreamResponse, r)
 }
 
 func (p *peer) RequestEventsStream(r dagstream.Request) error {
+	delay()
 	return p2p.Send(p.rw, RequestEventsStream, r)
 }
 
@@ -481,6 +502,7 @@ func (p *peer) Handshake(network uint64, progress PeerProgress, genesis common.H
 
 	go func() {
 		// send both HandshakeMsg and ProgressMsg
+		delay()
 		err := p2p.Send(p.rw, HandshakeMsg, &handshakeData{
 			ProtocolVersion: uint32(p.version),
 			NetworkID:       0, // TODO: set to `network` after all nodes updated to #184
@@ -511,6 +533,7 @@ func (p *peer) Handshake(network uint64, progress PeerProgress, genesis common.H
 }
 
 func (p *peer) SendProgress(progress PeerProgress) error {
+	delay()
 	return p2p.Send(p.rw, ProgressMsg, progress)
 }
 
