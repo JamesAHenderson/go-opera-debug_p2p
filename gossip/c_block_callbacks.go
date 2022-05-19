@@ -214,7 +214,7 @@ func consensusCallbackBeginBlockFn(
 				skipBlock = skipBlock || (emptyBlock && blockCtx.Time < bs.LastBlock.Time+es.Rules.Blocks.MaxEmptyBlockSkipPeriod)
 				// Finalize the progress of eventProcessor
 				bs = eventProcessor.Finalize(blockCtx, skipBlock) // TODO: refactor to not mutate the bs, it is unclear
-				{                                                 // sort and merge MPs cheaters
+				{ // sort and merge MPs cheaters
 					mpsCheaters := make(lachesis.Cheaters, 0, len(mpsCheatersMap))
 					for vid := range mpsCheatersMap {
 						mpsCheaters = append(mpsCheaters, vid)
@@ -305,10 +305,14 @@ func consensusCallbackBeginBlockFn(
 					for _, e := range block.Events {
 						all += store.GetEvent(e).GasPowerUsed()
 					}
+					ggg := len(block.Events)
 					block, blockEvents := spillBlockEvents(store, block, es.Rules)
 					left := uint64(0)
 					for _, e := range block.Events {
 						left += store.GetEvent(e).GasPowerUsed()
+					}
+					if all != left {
+						println("spill?", all, left, blockEvents.Len(), len(block.Events), ggg)
 					}
 					verwatcher.SpilledEvents += all - left
 					txs := make(types.Transactions, 0, blockEvents.Len()*10)
@@ -479,7 +483,7 @@ func spillBlockEvents(store *Store, block *inter.Block, network opera.Rules) (*i
 		// stop if limit is exceeded, erase [:i] events
 		if gasPowerUsedSum > network.Blocks.MaxBlockGas {
 			// spill
-			println("spill", e.ID().String(), e.GasPowerUsed(), gasPowerUsedSum,  network.Blocks.MaxBlockGas)
+			println("spill", e.ID().String(), e.GasPowerUsed(), gasPowerUsedSum, network.Blocks.MaxBlockGas)
 			block.Events = block.Events[i+1:]
 			fullEvents = fullEvents[i+1:]
 			break
