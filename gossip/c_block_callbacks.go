@@ -479,6 +479,7 @@ func spillBlockEvents(store *Store, block *inter.Block, network opera.Rules) (*i
 		// stop if limit is exceeded, erase [:i] events
 		if gasPowerUsedSum > network.Blocks.MaxBlockGas {
 			// spill
+			println("spill", e.ID().String(), e.GasPowerUsed(), gasPowerUsedSum,  network.Blocks.MaxBlockGas)
 			block.Events = block.Events[i+1:]
 			fullEvents = fullEvents[i+1:]
 			break
