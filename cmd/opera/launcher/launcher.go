@@ -339,7 +339,7 @@ func makeNode(ctx *cli.Context, cfg *config, genesisStore *genesisstore.Store) (
 		utils.Fatalf("Failed to create the service: %v", err)
 	}
 	if cfg.Emitter.Validator.ID != 0 {
-		svc.RegisterEmitter(emitter.NewEmitter(cfg.Emitter, svc.EmitterWorld(signer)))
+		svc.RegisterEmitter(emitter.NewEmitter(cfg.Emitter, svc.EmitterWorld(signer), engine))
 	}
 	err = engine.Bootstrap(svc.GetConsensusCallbacks())
 	if err != nil {

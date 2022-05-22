@@ -46,7 +46,7 @@ func (em *Emitter) OnNewEpoch(newValidators *pos.Validators, newEpoch idx.Epoch)
 	em.quorumIndexer = ancestor.NewQuorumIndexer(newValidators, vecmt2dagidx.Wrap(em.world.DagIndex()),
 		func(median, current, update idx.Event, validatorIdx idx.Validator) ancestor.Metric {
 			return updMetric(median, current, update, validatorIdx, newValidators)
-		})
+		}, em.lachesis)
 	em.payloadIndexer = ancestor.NewPayloadIndexer(PayloadIndexerSize)
 }
 

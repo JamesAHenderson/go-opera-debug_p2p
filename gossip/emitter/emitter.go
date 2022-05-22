@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Fantom-foundation/lachesis-base/abft"
 	"github.com/Fantom-foundation/lachesis-base/emitter/ancestor"
 	"github.com/Fantom-foundation/lachesis-base/hash"
 	"github.com/Fantom-foundation/lachesis-base/inter/idx"
@@ -35,6 +36,8 @@ type Emitter struct {
 	config Config
 
 	world World
+
+	lachesis *abft.Lachesis
 
 	syncStatus syncStatus
 
@@ -88,6 +91,7 @@ type Emitter struct {
 func NewEmitter(
 	config Config,
 	world World,
+	lachesis *abft.Lachesis,
 ) *Emitter {
 	// Randomize event time to decrease chance of 2 parallel instances emitting event at the same time
 	// It increases the chance of detecting parallel instances
@@ -102,6 +106,7 @@ func NewEmitter(
 		txTime:        txTime,
 		intervals:     config.EmitIntervals,
 		Periodic:      logger.Periodic{Instance: logger.New()},
+		lachesis:      lachesis,
 	}
 }
 

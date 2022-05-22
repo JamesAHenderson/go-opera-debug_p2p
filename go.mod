@@ -2,6 +2,8 @@ module github.com/Fantom-foundation/go-opera
 
 go 1.14
 
+replace github.com/Fantom-foundation/lachesis-base => github.com/JamesAHenderson/lachesis-base v0.0.0-20220522114802-681378b7016b
+
 require (
 	github.com/Fantom-foundation/lachesis-base v0.0.0-20220103160934-6b4931c60582
 	github.com/allegro/bigcache v1.2.1 // indirect
