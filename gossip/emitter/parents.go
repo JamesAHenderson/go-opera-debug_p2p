@@ -32,6 +32,8 @@ func (em *Emitter) buildSearchStrategies(maxParents idx.Event) []ancestor.Search
 // chooseParents selects an "optimal" parents set for the validator
 func (em *Emitter) chooseParents(epoch idx.Epoch, myValidatorID idx.ValidatorID) (*hash.Event, hash.Events, bool) {
 	selfParent := em.world.GetLastEvent(epoch, myValidatorID)
+	em.quorumIndexer.SelfParentEvent = *selfParent
+
 	heads := em.world.GetHeads(epoch) // events with no descendants
 
 	if selfParent != nil && len(em.world.DagIndex().NoCheaters(selfParent, hash.Events{*selfParent})) == 0 {

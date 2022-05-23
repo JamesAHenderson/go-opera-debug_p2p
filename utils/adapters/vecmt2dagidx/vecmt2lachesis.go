@@ -4,6 +4,7 @@ import (
 	"github.com/Fantom-foundation/lachesis-base/abft"
 	"github.com/Fantom-foundation/lachesis-base/abft/dagidx"
 	"github.com/Fantom-foundation/lachesis-base/hash"
+	"github.com/Fantom-foundation/lachesis-base/inter/dag"
 	"github.com/Fantom-foundation/lachesis-base/inter/idx"
 	"github.com/Fantom-foundation/lachesis-base/vecfc"
 
@@ -47,6 +48,10 @@ func (b AdapterSeq) Get(i idx.Validator) dagidx.Seq {
 
 func (v *Adapter) GetMergedHighestBefore(id hash.Event) dagidx.HighestBeforeSeq {
 	return AdapterSeq{v.Index.GetMergedHighestBefore(id)}
+}
+
+func (v *Adapter) GetEvent(id hash.Event) dag.Event {
+	return v.Index.GetEvent(id)
 }
 
 func Wrap(v *vecmt.Index) *Adapter {

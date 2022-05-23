@@ -22,7 +22,7 @@ func (vi *Index) NoCheaters(selfParent *hash.Event, options hash.Events) hash.Ev
 	highest := vi.Base.GetHighestBefore(*selfParent)
 	filtered := make(hash.Events, 0, len(options))
 	for _, id := range options {
-		e := vi.getEvent(id)
+		e := vi.GetEvent(id)
 		if e == nil {
 			vi.crit(errors.New("event not found"))
 		}
